@@ -4,6 +4,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { SignInButton, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { Navbar } from './Navbar';
+import { AnimatePresence, motion } from 'framer-motion';
+import { HelpCircle, X, Mail } from 'lucide-react';
 import { HeroChangelog } from './HeroChangelog';
 import { FileBrowser } from './FileBrowser';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -117,6 +119,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   const [changelogs, setChangelogs] = useState<Record<string, HeroChangelogData>>({});
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [managedUsers, setManagedUsers] = useState<VantorUser[]>([]);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   const displayName = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Vantor User';
 
@@ -1244,6 +1247,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         canDeleteContent={canDeleteContent}
         canManagePlatform={canManagePlatform}
         canUseRoleSwitcher={canUseRoleSwitcher}
+        onOpenHelp={() => setIsHelpOpen(true)}
       />
 
       {/* Main Content Body */}
@@ -1704,6 +1708,89 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
           currentUserId={user?.id || ''}
         />
       )}
+
+      <AnimatePresence>
+        {isHelpOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsHelpOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+
+            {/* Dialog Content */}
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              transition={{ type: 'spring', duration: 0.4, bounce: 0.15 }}
+              className="relative w-full max-w-lg overflow-hidden rounded-xl border border-blue-900/60 bg-[#090f22] p-6 shadow-2xl"
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => setIsHelpOpen(false)}
+                className="absolute top-4 right-4 rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                title="Close help dialog"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center space-x-3 border-b border-slate-800 pb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-950 border border-blue-800 text-blue-400">
+                    <HelpCircle className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Vantor Storage System</h2>
+                    <p className="text-xs text-slate-400 font-sans">Secure digital asset repository</p>
+                  </div>
+                </div>
+
+                {/* Info Content */}
+                <div className="space-y-3 text-xs text-slate-300 leading-relaxed font-sans font-medium">
+                  <p>
+                    Vantor Storage is a centralized, high-security cloud asset management workspace. It provides secure file distribution, access controls, detailed change logging, and versioning for digital content across authorized repositories.
+                  </p>
+                  <p>
+                    This console operates under rigid encryption protocols and restricts document sharing according to role-based access control policies. Unauthorized use or data exfiltration is strictly prohibited.
+                  </p>
+                </div>
+
+                {/* Technical Contact Section */}
+                <div className="rounded-lg border border-blue-950 bg-blue-950/40 p-4 space-y-2 font-sans">
+                  <h3 className="text-xs font-bold text-blue-300 flex items-center space-x-1.5 uppercase tracking-wide">
+                    <Mail className="h-3.5 w-3.5" />
+                    <span>Technical Support & Administration</span>
+                  </h3>
+                  <div className="text-xs text-slate-300">
+                    <div className="font-semibold text-white">Department of Information Technology</div>
+                    <a 
+                      href="mailto:it@vantor.group" 
+                      className="text-blue-400 hover:text-blue-300 hover:underline transition-colors mt-0.5 inline-block font-mono"
+                    >
+                      it@vantor.group
+                    </a>
+                  </div>
+                </div>
+
+                {/* Footer Action */}
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => setIsHelpOpen(false)}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/25"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
