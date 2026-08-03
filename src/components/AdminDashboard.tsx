@@ -21,7 +21,7 @@ import {
 import { VantorFile, VantorFolder, AuditLog, PermissionLevel, UserRole, VantorUser } from '../lib/types';
 import { ALL_USER_ROLES } from '../lib/authorization';
 import { useToast } from './ToastProvider';
-import { formatFriendlyDate } from '../lib/dateUtils';
+import { formatFriendlyDate, formatBytes } from '../lib/dateUtils';
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -178,7 +178,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const calculateTotalSize = () => {
     const bytes = files.reduce((acc, f) => acc + f.size, 0) + folders.reduce((acc, f) => acc + f.totalSize, 0);
-    return (bytes / (1024 * 1024)).toFixed(1);
+    return formatBytes(bytes);
   };
 
   return (
@@ -207,7 +207,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <HardDrive className="h-4 w-4 text-blue-400" />
             <div>
               <span className="text-slate-400 block text-[10px] uppercase">Storage Used</span>
-              <span className="font-mono font-bold text-white text-xs">{calculateTotalSize()} MB</span>
+              <span className="font-mono font-bold text-white text-xs">{calculateTotalSize()}</span>
             </div>
           </div>
           <div className="flex items-center space-x-2">

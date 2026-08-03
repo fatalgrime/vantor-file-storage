@@ -32,3 +32,17 @@ export function formatFriendlyDate(dateInput: string | Date | undefined | null):
     return `${month}/${day}/${year}`;
   }
 }
+
+/**
+ * Formats a byte number into a human-readable size string.
+ */
+export function formatBytes(bytes: number, decimals: number = 1): string {
+  if (bytes === 0) return '0.0 MB';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  // If the computed index is beyond sizes length, bound it
+  const index = Math.min(i, sizes.length - 1);
+  return parseFloat((bytes / Math.pow(k, index)).toFixed(dm)) + ' ' + sizes[index];
+}

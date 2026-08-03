@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { SignInButton, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { Navbar } from './Navbar';
+import { formatBytes } from '../lib/dateUtils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { HelpCircle, X, Mail } from 'lucide-react';
 import { HeroChangelog } from './HeroChangelog';
@@ -501,7 +502,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   const currentTotalSizeFormatted = useMemo(() => {
     const totalBytes = displayedFiles.reduce((acc, f) => acc + f.size, 0) +
       displayedFolders.reduce((acc, f) => acc + f.totalSize, 0);
-    return `${(totalBytes / (1024 * 1024)).toFixed(1)} MB`;
+    return formatBytes(totalBytes);
   }, [displayedFiles, displayedFolders]);
 
   // Selection handlers
