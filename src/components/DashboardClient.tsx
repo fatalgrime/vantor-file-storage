@@ -165,7 +165,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         setChangelog(data.changelog || { title: '', subtitle: '', releases: [] });
         setChangelogs(data.changelogs || {});
         setAuditLogs(data.auditLogs || []);
-        
+
         const loadedUsers = data.users || [];
         let activeUsers = [...loadedUsers];
         const currentEmail = user?.primaryEmailAddress?.emailAddress;
@@ -238,14 +238,14 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
             const needsActiveUpdate = originalSelf && (!originalSelf.lastActive || originalSelf.lastActive === 'today' || new Date(originalSelf.lastActive).getTime() < oneHourAgo);
 
             if (stateChanged || needsActiveUpdate || (originalSelf && (originalSelf.avatarUrl !== user.imageUrl || originalSelf.name !== displayName))) {
-              activeUsers = resolvedUsers.map(u => 
-                u.id === user.id 
-                  ? { 
-                      ...u, 
-                      lastActive: new Date().toISOString(),
-                      avatarUrl: user.imageUrl || u.avatarUrl,
-                      name: displayName || u.name
-                    }
+              activeUsers = resolvedUsers.map(u =>
+                u.id === user.id
+                  ? {
+                    ...u,
+                    lastActive: new Date().toISOString(),
+                    avatarUrl: user.imageUrl || u.avatarUrl,
+                    name: displayName || u.name
+                  }
                   : u
               );
               await persistState({ users: activeUsers });
@@ -255,15 +255,15 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
           } else if (selfByEmailIndex !== -1) {
             // The current user has a matching email in the DB but under a different ID.
             // Update that record to use current ID, name, avatar, and active timestamp, preserving its role.
-            activeUsers = resolvedUsers.map((u, idx) => 
-              idx === selfByEmailIndex 
+            activeUsers = resolvedUsers.map((u, idx) =>
+              idx === selfByEmailIndex
                 ? {
-                    ...u,
-                    id: user.id,
-                    name: displayName,
-                    avatarUrl: user.imageUrl || u.avatarUrl,
-                    lastActive: new Date().toISOString()
-                  }
+                  ...u,
+                  id: user.id,
+                  name: displayName,
+                  avatarUrl: user.imageUrl || u.avatarUrl,
+                  lastActive: new Date().toISOString()
+                }
                 : u
             );
             await persistState({ users: activeUsers });
@@ -500,10 +500,12 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
 
   // Overall totals for current view
   const currentTotalSizeFormatted = useMemo(() => {
-    const totalBytes = displayedFiles.reduce((acc, f) => acc + f.size, 0) +
-      displayedFolders.reduce((acc, f) => acc + f.totalSize, 0);
+    const targetFiles = showRepositoryIndex ? files : displayedFiles;
+    const targetFolders = showRepositoryIndex ? folders : displayedFolders;
+    const totalBytes = targetFiles.reduce((acc, f) => acc + f.size, 0) +
+      targetFolders.reduce((acc, f) => acc + f.totalSize, 0);
     return formatBytes(totalBytes);
-  }, [displayedFiles, displayedFolders]);
+  }, [showRepositoryIndex, files, displayedFiles, folders, displayedFolders]);
 
   // Selection handlers
   const handleToggleSelect = (id: string) => {
@@ -938,7 +940,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   const handleRenameItem = (item: VantorFile | VantorFolder, isFolder: boolean) => {
     const repositoryId = 'repositoryId' in item ? item.repositoryId || DEFAULT_REPOSITORY_ID : DEFAULT_REPOSITORY_ID;
     const repository = repositories.find((candidate) => candidate.id === repositoryId) || currentRepository;
-    
+
     const hasEditAccess = canEditItem(effectiveRole, currentUserId, item, folders, repository);
     if (!hasEditAccess) {
       addToast({ type: 'error', title: 'Access denied', message: 'You do not have editor permissions for this item.' });
@@ -1026,15 +1028,15 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   const handleMoveItem = (item: VantorFile | VantorFolder, isFolder: boolean) => {
     const repositoryId = 'repositoryId' in item ? item.repositoryId || DEFAULT_REPOSITORY_ID : DEFAULT_REPOSITORY_ID;
     const repository = repositories.find((candidate) => candidate.id === repositoryId) || currentRepository;
-    
+
     const hasEditAccess = canEditItem(effectiveRole, currentUserId, item, folders, repository);
     if (!hasEditAccess) {
       addToast({ type: 'error', title: 'Access denied', message: 'You do not have editor permissions for this item.' });
       return;
     }
 
-    const currentParentId = isFolder 
-      ? (item as VantorFolder).parentId 
+    const currentParentId = isFolder
+      ? (item as VantorFolder).parentId
       : (item as VantorFile).folderId;
 
     setDialog({
@@ -1315,8 +1317,8 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                       key={repository.id}
                       onClick={() => handleSelectRepository(repository.id)}
                       className={`rounded-lg border p-4 text-left transition-colors ${isActive
-                          ? 'border-blue-500 bg-blue-950/30'
-                          : 'border-[#1e3059] bg-[#070c18] hover:border-blue-700/80'
+                        ? 'border-blue-500 bg-blue-950/30'
+                        : 'border-[#1e3059] bg-[#070c18] hover:border-blue-700/80'
                         }`}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -1675,8 +1677,8 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                   }
                 }}
                 className={`rounded-lg px-3.5 py-2 text-xs font-semibold text-white ${(dialog.type === 'confirm' && dialog.tone === 'danger') || dialog.type === 'deleteRepository'
-                    ? 'bg-red-600 hover:bg-red-500'
-                    : 'bg-blue-600 hover:bg-blue-500'
+                  ? 'bg-red-600 hover:bg-red-500'
+                  : 'bg-blue-600 hover:bg-blue-500'
                   } disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {dialog.type === 'confirm'
@@ -1769,8 +1771,8 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                   </h3>
                   <div className="text-xs text-slate-300">
                     <div className="font-semibold text-white">Department of Information Technology</div>
-                    <a 
-                      href="mailto:it@vantor.group" 
+                    <a
+                      href="mailto:it@vantor.group"
                       className="text-blue-400 hover:text-blue-300 hover:underline transition-colors mt-0.5 inline-block font-mono"
                     >
                       it@vantor.group
