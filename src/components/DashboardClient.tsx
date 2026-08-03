@@ -1244,8 +1244,6 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         canDeleteContent={canDeleteContent}
         canManagePlatform={canManagePlatform}
         canUseRoleSwitcher={canUseRoleSwitcher}
-        theme={theme}
-        setTheme={handleSetTheme}
       />
 
       {/* Main Content Body */}
