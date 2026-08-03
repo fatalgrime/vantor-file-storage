@@ -163,19 +163,122 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         setAuditLogs(data.auditLogs || []);
         
         const loadedUsers = data.users || [];
-        let activeUsers = loadedUsers;
-        if (user?.id && !loadedUsers.some(u => u.id === user.id)) {
-          const newUser: VantorUser = {
-            id: user.id,
-            name: displayName,
-            email: user.primaryEmailAddress?.emailAddress || 'no-email@clerk.user',
-            avatarUrl: user.imageUrl,
-            role: 'viewer',
-            locked: false,
-            lastActive: new Date().toISOString(),
-          };
-          activeUsers = [...loadedUsers, newUser];
-          await persistState({ users: activeUsers });
+        let activeUsers = [...loadedUsers];
+        const currentEmail = user?.primaryEmailAddress?.emailAddress;
+
+        if (user?.id) {
+          // 1. General sweep to merge any duplicates by email first
+          const emailGroups: Record<string, VantorUser[]> = {};
+          activeUsers.forEach(u => {
+            if (u.email) {
+              const emailKey = u.email.toLowerCase();
+              if (!emailGroups[emailKey]) emailGroups[emailKey] = [];
+              emailGroups[emailKey].push(u);
+            }
+          });
+
+          const resolvedUsers: VantorUser[] = [];
+          let stateChanged = false;
+
+          for (const emailKey of Object.keys(emailGroups)) {
+            const group = emailGroups[emailKey];
+            if (group.length === 1) {
+              resolvedUsers.push(group[0]);
+            } else {
+              stateChanged = true;
+              // Consolidate the group
+              const matchingSelf = group.find(u => u.id === user.id);
+              if (matchingSelf) {
+                // Merge others into matchingSelf
+                let bestRole = matchingSelf.role;
+                group.forEach(u => {
+                  if (u.id !== user.id) {
+                    if (u.role === 'admin') bestRole = 'admin';
+                    else if (u.role === 'author' && bestRole !== 'admin') bestRole = 'author';
+                  }
+                });
+                resolvedUsers.push({
+                  ...matchingSelf,
+                  role: bestRole,
+                  lastActive: new Date().toISOString(),
+                  avatarUrl: user.imageUrl || matchingSelf.avatarUrl,
+                  name: displayName || matchingSelf.name
+                });
+              } else {
+                // None match current user.id. Select the best one to keep
+                let bestUser = group[0];
+                group.forEach(u => {
+                  const roleRank = (r: string) => r === 'admin' ? 3 : r === 'author' ? 2 : 1;
+                  if (roleRank(u.role) > roleRank(bestUser.role)) {
+                    bestUser = u;
+                  } else if (roleRank(u.role) === roleRank(bestUser.role)) {
+                    const dateU = new Date(u.lastActive).getTime();
+                    const dateBest = new Date(bestUser.lastActive).getTime();
+                    if (!isNaN(dateU) && (isNaN(dateBest) || dateU > dateBest)) {
+                      bestUser = u;
+                    }
+                  }
+                });
+                resolvedUsers.push(bestUser);
+              }
+            }
+          }
+
+          // 2. Check if current user exists in resolved users list
+          const hasSelf = resolvedUsers.some(u => u.id === user.id);
+          const selfByEmailIndex = currentEmail ? resolvedUsers.findIndex(u => u.email.toLowerCase() === currentEmail.toLowerCase()) : -1;
+
+          if (hasSelf) {
+            const originalSelf = resolvedUsers.find(u => u.id === user.id);
+            const oneHourAgo = Date.now() - 60 * 60 * 1000;
+            const needsActiveUpdate = originalSelf && (!originalSelf.lastActive || originalSelf.lastActive === 'today' || new Date(originalSelf.lastActive).getTime() < oneHourAgo);
+
+            if (stateChanged || needsActiveUpdate || (originalSelf && (originalSelf.avatarUrl !== user.imageUrl || originalSelf.name !== displayName))) {
+              activeUsers = resolvedUsers.map(u => 
+                u.id === user.id 
+                  ? { 
+                      ...u, 
+                      lastActive: new Date().toISOString(),
+                      avatarUrl: user.imageUrl || u.avatarUrl,
+                      name: displayName || u.name
+                    }
+                  : u
+              );
+              await persistState({ users: activeUsers });
+            } else {
+              activeUsers = resolvedUsers;
+            }
+          } else if (selfByEmailIndex !== -1) {
+            // The current user has a matching email in the DB but under a different ID.
+            // Update that record to use current ID, name, avatar, and active timestamp, preserving its role.
+            activeUsers = resolvedUsers.map((u, idx) => 
+              idx === selfByEmailIndex 
+                ? {
+                    ...u,
+                    id: user.id,
+                    name: displayName,
+                    avatarUrl: user.imageUrl || u.avatarUrl,
+                    lastActive: new Date().toISOString()
+                  }
+                : u
+            );
+            await persistState({ users: activeUsers });
+          } else {
+            // Brand new user registration
+            const newUser: VantorUser = {
+              id: user.id,
+              name: displayName,
+              email: currentEmail || 'no-email@clerk.user',
+              avatarUrl: user.imageUrl,
+              role: 'viewer',
+              locked: false,
+              lastActive: new Date().toISOString(),
+            };
+            activeUsers = [...resolvedUsers, newUser];
+            await persistState({ users: activeUsers });
+          }
+        } else {
+          activeUsers = loadedUsers;
         }
         setManagedUsers(activeUsers);
         setTheme(data.settings?.theme || 'dark');

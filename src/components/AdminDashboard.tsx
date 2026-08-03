@@ -1,17 +1,17 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  X, 
-  Upload, 
-  FolderPlus, 
-  ShieldCheck, 
-  Activity, 
-  FileText, 
-  Folder, 
-  Sliders, 
-  Trash2, 
-  Clock, 
+import {
+  X,
+  Upload,
+  FolderPlus,
+  ShieldCheck,
+  Activity,
+  FileText,
+  Folder,
+  Sliders,
+  Trash2,
+  Clock,
   HardDrive,
   Users,
   Lock,
@@ -21,6 +21,7 @@ import {
 import { VantorFile, VantorFolder, AuditLog, PermissionLevel, UserRole, VantorUser } from '../lib/types';
 import { ALL_USER_ROLES } from '../lib/authorization';
 import { useToast } from './ToastProvider';
+import { formatFriendlyDate } from '../lib/dateUtils';
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -236,9 +237,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="flex items-center border-b border-slate-800 px-6 bg-[#080d1c] text-xs font-medium">
           <button
             onClick={() => setActiveTab('upload')}
-            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${
-              activeTab === 'upload' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${activeTab === 'upload' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
           >
             <Upload className="h-3.5 w-3.5" />
             <span>Upload New File</span>
@@ -246,9 +246,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <button
             onClick={() => setActiveTab('folder')}
-            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${
-              activeTab === 'folder' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${activeTab === 'folder' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
           >
             <FolderPlus className="h-3.5 w-3.5" />
             <span>Create Folder</span>
@@ -256,9 +255,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <button
             onClick={() => setActiveTab('files')}
-            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${
-              activeTab === 'files' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${activeTab === 'files' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
           >
             <Sliders className="h-3.5 w-3.5" />
             <span>Manage Existing Metadata</span>
@@ -266,9 +264,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <button
             onClick={() => setActiveTab('logs')}
-            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${
-              activeTab === 'logs' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${activeTab === 'logs' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
           >
             <Clock className="h-3.5 w-3.5" />
             <span>Security Audit Logs</span>
@@ -276,9 +273,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <button
             onClick={() => setActiveTab('users')}
-            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${
-              activeTab === 'users' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${activeTab === 'users' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
           >
             <Users className="h-3.5 w-3.5" />
             <span>User Management</span>
@@ -572,15 +568,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </select>
                           </td>
                           <td className="px-3 py-3">
-                            <span className={`rounded px-2 py-1 text-[10px] font-semibold uppercase ${
-                              managedUser.locked
+                            <span className={`rounded px-2 py-1 text-[10px] font-semibold uppercase ${managedUser.locked
                                 ? 'bg-red-950 text-red-300 border border-red-800'
                                 : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                            }`}>
+                              }`}>
                               {managedUser.locked ? 'Locked' : 'Active'}
                             </span>
                           </td>
-                          <td className="px-3 py-3 font-mono text-[11px] text-slate-400">{managedUser.lastActive}</td>
+                          <td className="px-3 py-3 font-mono text-[11px] text-slate-400">{formatFriendlyDate(managedUser.lastActive)}</td>
                           <td className="px-3 py-3">
                             <div className="flex justify-end gap-2">
                               <button
