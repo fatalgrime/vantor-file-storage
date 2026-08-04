@@ -94,3 +94,21 @@ export interface HeroChangelogData {
     items: string[];
   }[];
 }
+
+export interface ShareLink {
+  id: string;            // Unique hash/token for the URL
+  itemId: string;        // ID of target VantorFile or VantorFolder
+  itemType: 'file' | 'folder';
+  name: string;          // Name of the shared item
+  label: string;         // Custom link label (e.g. "Public Access")
+  permission: 'view' | 'edit'; // 'view' is view-only, 'edit' allows downloads
+  allowDownload: boolean; // Fine-grained permission: can they download?
+  password?: string;     // Password protection (optional)
+  expiresAt?: string;    // Expiration timestamp (optional)
+  maxAccessCount?: number; // Maximum visits (optional)
+  createdAt: string;
+  createdBy: string;
+  viewsCount: number;
+  downloadsCount: number;
+}
+

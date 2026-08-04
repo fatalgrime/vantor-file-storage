@@ -11,7 +11,7 @@ import {
   INITIAL_USERS,
 } from '../../../lib/db';
 import { canEditRepository, canManagePlatform } from '../../../lib/authorization';
-import { VantorFile, VantorFolder, VantorRepository, VantorUser } from '../../../lib/types';
+import { VantorFile, VantorFolder, VantorRepository, VantorUser, ShareLink } from '../../../lib/types';
 
 const STATE_ID = 'default';
 
@@ -26,6 +26,7 @@ const defaultState = {
   settings: {
     theme: 'dark',
   },
+  shares: [] as ShareLink[],
 };
 
 type StorageState = typeof defaultState;

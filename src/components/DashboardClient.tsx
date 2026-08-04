@@ -33,7 +33,7 @@ import {
   INITIAL_REPOSITORIES,
   INITIAL_USERS,
 } from '../lib/db';
-import { VantorFile, VantorFolder, AuditLog, HeroChangelogData, UserRole, PermissionLevel, VantorRepository, VantorUser, Collaborator } from '../lib/types';
+import { VantorFile, VantorFolder, AuditLog, HeroChangelogData, UserRole, PermissionLevel, VantorRepository, VantorUser, Collaborator, ShareLink } from '../lib/types';
 
 interface PersistedState {
   files: VantorFile[];
@@ -43,6 +43,7 @@ interface PersistedState {
   changelogs?: Record<string, HeroChangelogData>;
   auditLogs: AuditLog[];
   users: VantorUser[];
+  shares?: ShareLink[];
   settings?: {
     theme?: 'dark' | 'light';
   };
@@ -120,6 +121,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   const [changelogs, setChangelogs] = useState<Record<string, HeroChangelogData>>({});
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [managedUsers, setManagedUsers] = useState<VantorUser[]>([]);
+  const [shares, setShares] = useState<ShareLink[]>([]);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   const displayName = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Vantor User';
@@ -165,6 +167,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         setChangelog(data.changelog || { title: '', subtitle: '', releases: [] });
         setChangelogs(data.changelogs || {});
         setAuditLogs(data.auditLogs || []);
+        setShares(data.shares || []);
 
         const loadedUsers = data.users || [];
         let activeUsers = [...loadedUsers];
@@ -603,12 +606,38 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   };
 
   const handleCopyLink = async (item: VantorFile | VantorFolder) => {
-    const link = `https://vantor.cloud/storage/${item.id}`;
+    const existing = shares.find(s => s.itemId === item.id && (!s.expiresAt || new Date(s.expiresAt).getTime() > Date.now()));
+    let linkId = '';
+
+    if (existing) {
+      linkId = existing.id;
+    } else {
+      linkId = 'share-' + Math.random().toString(36).substring(2, 11) + Math.random().toString(36).substring(2, 11);
+      const newLink: ShareLink = {
+        id: linkId,
+        itemId: item.id,
+        itemType: 'parentId' in item ? 'folder' : 'file',
+        name: item.name,
+        label: 'Quick Share Link',
+        permission: 'edit',
+        allowDownload: true,
+        createdAt: new Date().toISOString(),
+        createdBy: currentUserId,
+        viewsCount: 0,
+        downloadsCount: 0,
+      };
+
+      const nextShares = [...shares, newLink];
+      setShares(nextShares);
+      await persistState({ shares: nextShares }).catch((error) => console.error(error));
+    }
+
+    const url = `${window.location.origin}/share/${linkId}`;
     try {
-      await navigator.clipboard.writeText(link);
-      addToast({ type: 'info', title: 'Link copied', message: `Secure link for "${item.name}" copied to clipboard.` });
+      await navigator.clipboard.writeText(url);
+      addToast({ type: 'success', title: 'Share link copied', message: `Secure link for "${item.name}" copied to clipboard.` });
     } catch {
-      addToast({ type: 'error', title: 'Copy failed', message: 'The link could not be copied automatically. Please try again.' });
+      addToast({ type: 'error', title: 'Copy failed', message: 'The link could not be copied automatically.' });
     }
   };
 
@@ -1167,6 +1196,11 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
       .catch((error) => setLoadError(error.message));
   };
 
+  const handleSaveShares = (nextShares: ShareLink[]) => {
+    setShares(nextShares);
+    persistState({ shares: nextShares }).catch((error) => setLoadError(error.message));
+  };
+
   const addAuditLog = (
     action: AuditLog['action'],
     targetName: string,
@@ -1709,6 +1743,8 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
           onSavePermissions={handleSavePermissions}
           users={managedUsers}
           currentUserId={user?.id || ''}
+          shares={shares}
+          onSaveShares={handleSaveShares}
         />
       )}
 
