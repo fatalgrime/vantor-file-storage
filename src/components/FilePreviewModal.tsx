@@ -426,7 +426,8 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           <div className="flex items-center space-x-3 bg-slate-900 border border-slate-800 rounded-lg px-4 py-1.5 text-xs text-slate-300">
             <button 
               onClick={() => setZoom(z => Math.max(0.25, z - 0.25))}
-              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
+              disabled={zoom <= 0.25}
+              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Zoom Out"
             >
               <ZoomOut className="h-4 w-4" />
@@ -434,7 +435,8 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
             <span className="font-mono min-w-[48px] text-center">{Math.round(zoom * 100)}%</span>
             <button 
               onClick={() => setZoom(z => Math.min(3, z + 0.25))}
-              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
+              disabled={zoom >= 3.0}
+              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Zoom In"
             >
               <ZoomIn className="h-4 w-4" />

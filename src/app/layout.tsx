@@ -3,7 +3,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Vantor Secure Cloud Storage',
+  title: 'Vantor Storage',
   description: 'Enterprise grade encrypted file storage and firmware management system for Vantor.',
   icons: {
     icon: '/favicon.ico',

@@ -476,14 +476,18 @@ export default function PublicSharePage() {
           <div className="flex items-center space-x-3 bg-slate-900 border border-slate-800 rounded-lg px-4 py-1.5 text-xs text-slate-300">
             <button 
               onClick={() => setZoom(z => Math.max(0.25, z - 0.25))}
-              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
+              disabled={zoom <= 0.25}
+              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title="Zoom Out"
             >
               <ZoomOut className="h-4 w-4" />
             </button>
             <span className="font-mono min-w-[48px] text-center">{Math.round(zoom * 100)}%</span>
             <button 
               onClick={() => setZoom(z => Math.min(3, z + 0.25))}
-              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
+              disabled={zoom >= 3.0}
+              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title="Zoom In"
             >
               <ZoomIn className="h-4 w-4" />
             </button>
@@ -834,9 +838,6 @@ export default function PublicSharePage() {
           <div className="h-4 w-px bg-slate-800"></div>
           <span className="text-[11px] font-bold tracking-widest uppercase text-slate-400">Share Portal</span>
         </div>
-        <div className="flex items-center space-x-2 text-[10px] bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-slate-400 font-mono">
-          <Shield className="h-3.5 w-3.5 text-blue-400 mr-1" /> SECURE PUBLIC TUNNEL
-        </div>
       </header>
 
       {/* Main Container */}
@@ -983,7 +984,7 @@ export default function PublicSharePage() {
 
       {/* FOOTER SUMMARY */}
       <footer className="border-t border-[#1e3059] bg-[#070c18] py-4 text-center text-[10px] text-slate-500 font-mono flex-shrink-0">
-        POWERED BY VANTOR SECURE STORAGE VAULT · ALL RIGHTS RESERVED
+        POWERED BY VANTOR STORAGE (storage.vantor.group)
       </footer>
 
       {/* EMBEDDED FILE PREVIEW MODAL FOR FOLDER BROWSER */}
