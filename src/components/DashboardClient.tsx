@@ -1236,7 +1236,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
       <div className="min-h-screen bg-[#060a17] text-slate-100 flex items-center justify-center font-sans">
         <div className="flex items-center space-x-3">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
-          <span className="text-xs text-slate-400 font-mono font-medium">Loading Vantor Cloud Vault...</span>
+          <span className="text-xs text-slate-400 font-mono font-medium">Loading Vantor Storage...</span>
         </div>
       </div>
     );

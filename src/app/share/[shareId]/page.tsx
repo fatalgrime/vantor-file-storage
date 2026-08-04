@@ -763,7 +763,7 @@ export default function PublicSharePage() {
       <div className="min-h-screen bg-[#060a17] text-slate-100 flex items-center justify-center font-sans">
         <div className="flex items-center space-x-3">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
-          <span className="text-xs text-slate-400 font-mono font-medium">Securing connection to Vantor Vault...</span>
+          <span className="text-xs text-slate-400 font-mono font-medium">Securing connection to Vantor Storage...</span>
         </div>
       </div>
     );
@@ -984,7 +984,7 @@ export default function PublicSharePage() {
 
       {/* FOOTER SUMMARY */}
       <footer className="border-t border-[#1e3059] bg-[#070c18] py-4 text-center text-[10px] text-slate-500 font-mono flex-shrink-0">
-        POWERED BY VANTOR STORAGE (storage.vantor.group)
+        Powered by Vantor Storage (storage.vantor.group) • All Rights Reserved.
       </footer>
 
       {/* EMBEDDED FILE PREVIEW MODAL FOR FOLDER BROWSER */}
