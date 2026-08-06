@@ -314,7 +314,8 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [modifiedFilter, setModifiedFilter] = useState('ALL');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
+  const [dashboardViewMode, setDashboardViewMode] = useState<'list' | 'grid'>('grid');
+  const [repositoryViewMode, setRepositoryViewMode] = useState<'list' | 'grid'>('list');
 
   // Modal states
   const [previewFile, setPreviewFile] = useState<VantorFile | null>(null);
@@ -1278,8 +1279,14 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         setTypeFilter={setTypeFilter}
         modifiedFilter={modifiedFilter}
         setModifiedFilter={setModifiedFilter}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
+        viewMode={showRepositoryIndex ? dashboardViewMode : repositoryViewMode}
+        setViewMode={(mode) => {
+          if (showRepositoryIndex) {
+            setDashboardViewMode(mode);
+          } else {
+            setRepositoryViewMode(mode);
+          }
+        }}
         selectedCount={selectedIds.length}
         onBatchDownload={handleBatchDownload}
         onBatchDelete={handleBatchDelete}
@@ -1340,7 +1347,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                       </button>
                     )}
                   </div>
-                ) : viewMode === 'list' ? (
+                ) : dashboardViewMode === 'list' ? (
                   <div className="overflow-x-auto rounded-lg border border-[#1e3059] bg-[#070c18]">
                     <table className="w-full text-left text-xs font-sans border-collapse">
                       <thead>
@@ -1562,7 +1569,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                   onManagePermissions={(item, isFolder) => setPermissionTarget({ item, isFolder })}
                   onDeleteItem={handleDeleteItem}
                   onMoveItem={handleMoveItem}
-                  viewMode={viewMode}
+                  viewMode={repositoryViewMode}
                   currentRole={effectiveRole}
                   canEdit={(item) => canEditItem(effectiveRole, currentUserId, item, folders, currentRepository)}
                   canDelete={canDeleteContent}
