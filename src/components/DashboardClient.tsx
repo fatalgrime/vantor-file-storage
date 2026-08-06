@@ -314,7 +314,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [modifiedFilter, setModifiedFilter] = useState('ALL');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
 
   // Modal states
   const [previewFile, setPreviewFile] = useState<VantorFile | null>(null);

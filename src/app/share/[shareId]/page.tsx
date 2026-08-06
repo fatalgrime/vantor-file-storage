@@ -2,20 +2,20 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { 
-  Lock, 
+import {
+  Lock,
   X,
-  Key, 
-  Download, 
-  Calendar, 
-  HardDrive, 
-  Eye, 
-  Folder, 
-  FileText, 
-  ArrowLeft, 
-  Music, 
-  Video, 
-  FileSpreadsheet, 
+  Key,
+  Download,
+  Calendar,
+  HardDrive,
+  Eye,
+  Folder,
+  FileText,
+  ArrowLeft,
+  Music,
+  Video,
+  FileSpreadsheet,
   Code,
   ZoomIn,
   ZoomOut,
@@ -44,11 +44,12 @@ export default function PublicSharePage() {
   // Loading / Error states
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
-  
+
   // Password screen
   const [passwordRequired, setPasswordRequired] = useState(false);
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const viewLoggedRef = useRef(false);
 
   // Share link meta
   const [linkLabel, setLinkLabel] = useState('');
@@ -57,7 +58,7 @@ export default function PublicSharePage() {
 
   // Payload data
   const [fileData, setFileData] = useState<VantorFile | null>(null);
-  
+
   // Folder browser states
   const [rootFolder, setRootFolder] = useState<VantorFolder | null>(null);
   const [currentFolder, setCurrentFolder] = useState<VantorFolder | null>(null);
@@ -94,7 +95,7 @@ export default function PublicSharePage() {
     try {
       setLoading(true);
       setErrorMsg('');
-      
+
       let url = `/api/public/share/${shareId}`;
       const queryParams: string[] = [];
       if (enteredPassword) queryParams.push(`password=${encodeURIComponent(enteredPassword)}`);
@@ -108,7 +109,7 @@ export default function PublicSharePage() {
       }
 
       const data = await res.json();
-      
+
       if (data.passwordRequired) {
         setPasswordRequired(true);
         setLinkLabel(data.label || 'Secure Link');
@@ -120,14 +121,14 @@ export default function PublicSharePage() {
       setPasswordRequired(false);
       setAllowDownload(data.allowDownload);
       setItemType(data.itemType);
-      
+
       if (data.itemType === 'file') {
         setFileData(data.file);
-        
+
         // Setup Media URL if audio/video
         const f = data.file as VantorFile;
-        const isMedia = f.mimeType.startsWith('audio/') || f.mimeType.startsWith('video/') || 
-                        ['mp3', 'wav', 'ogg', 'mp4', 'webm', 'mov'].includes(f.extension);
+        const isMedia = f.mimeType.startsWith('audio/') || f.mimeType.startsWith('video/') ||
+          ['mp3', 'wav', 'ogg', 'mp4', 'webm', 'mov'].includes(f.extension);
         if (isMedia && f.content) {
           let mUrl = '';
           if (f.content.startsWith('data:')) {
@@ -154,7 +155,7 @@ export default function PublicSharePage() {
         setCurrentFolder(data.folder);
         setFolderFiles(data.files || []);
         setFolderFolders(data.folders || []);
-        
+
         // Update breadcrumb trail path
         if (data.folder && data.rootFolder) {
           const trail = [{ id: data.rootFolder.id, name: data.rootFolder.name }];
@@ -166,11 +167,14 @@ export default function PublicSharePage() {
       }
 
       // Log view count increment (silently)
-      await fetch(`/api/public/share/${shareId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: enteredPassword, action: 'view' }),
-      }).catch(e => console.error("Metrics view error", e));
+      if (!viewLoggedRef.current) {
+        viewLoggedRef.current = true;
+        await fetch(`/api/public/share/${shareId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: enteredPassword, action: 'view' }),
+        }).catch(e => console.error("Metrics view error", e));
+      }
 
       setLoading(false);
     } catch (err: any) {
@@ -200,7 +204,7 @@ export default function PublicSharePage() {
     e.preventDefault();
     setAuthError('');
     if (!password.trim()) return;
-    
+
     // Test login
     fetchShareData(password);
   };
@@ -280,7 +284,7 @@ export default function PublicSharePage() {
   // Markdown Parser
   const parseInlineMarkdown = (text: string) => {
     let parts: (string | React.ReactNode)[] = [text];
-    
+
     // Bold **text**
     parts = parts.flatMap(part => {
       if (typeof part !== 'string') return part;
@@ -329,7 +333,7 @@ export default function PublicSharePage() {
     const lines = text.split('\n');
     let inCodeBlock = false;
     let codeLines: string[] = [];
-    
+
     return lines.map((line, index) => {
       if (line.trim().startsWith('```')) {
         if (inCodeBlock) {
@@ -346,12 +350,12 @@ export default function PublicSharePage() {
           return null;
         }
       }
-      
+
       if (inCodeBlock) {
         codeLines.push(line);
         return null;
       }
-      
+
       if (line.startsWith('# ')) {
         return <h1 key={index} className="text-xl font-bold text-white border-b border-slate-800 pb-1 mt-5 mb-2.5">{parseInlineMarkdown(line.slice(2))}</h1>;
       }
@@ -361,7 +365,7 @@ export default function PublicSharePage() {
       if (line.startsWith('### ')) {
         return <h3 key={index} className="text-base font-bold text-slate-200 mt-3 mb-1">{parseInlineMarkdown(line.slice(4))}</h3>;
       }
-      
+
       if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
         return (
           <li key={index} className="list-disc ml-5 text-slate-300 my-1 font-sans">
@@ -369,11 +373,11 @@ export default function PublicSharePage() {
           </li>
         );
       }
-      
+
       if (!line.trim()) {
         return <div key={index} className="h-3" />;
       }
-      
+
       return (
         <p key={index} className="text-slate-300 leading-relaxed text-sm my-2 font-sans">
           {parseInlineMarkdown(line)}
@@ -387,13 +391,13 @@ export default function PublicSharePage() {
     if (!content) return { headers: [], rows: [] };
     const lines = content.split('\n').filter(l => l.trim() !== '');
     if (lines.length === 0) return { headers: [], rows: [] };
-    
+
     const parseLine = (line: string) => {
       const result = [];
       let current = '';
       let inQuotes = false;
       const delimiter = fileData?.extension === 'tsv' ? '\t' : ',';
-      
+
       for (let i = 0; i < line.length; i++) {
         const char = line[i];
         if (char === '"') {
@@ -408,7 +412,7 @@ export default function PublicSharePage() {
       result.push(current.trim().replace(/^"|"$/g, ''));
       return result;
     };
-    
+
     const headers = parseLine(lines[0]);
     const rows = lines.slice(1).map(parseLine);
     return { headers, rows };
@@ -419,7 +423,7 @@ export default function PublicSharePage() {
     if (!code) return <span className="text-slate-500">// Empty file</span>;
     const keywords = ['const', 'let', 'var', 'function', 'return', 'import', 'export', 'from', 'class', 'default', 'extends', 'if', 'else', 'for', 'while', 'try', 'catch', 'def', 'import', 'as', 'with', 'public', 'private', 'interface', 'type', 'string', 'number', 'boolean', 'any'];
     const lines = code.split('\n');
-    
+
     return lines.map((line, idx) => {
       if (line.trim().startsWith('//') || line.trim().startsWith('#') || line.trim().startsWith('/*') || line.trim().startsWith('*')) {
         return (
@@ -429,11 +433,11 @@ export default function PublicSharePage() {
           </div>
         );
       }
-      
+
       const words = line.split(/(\s+|=|\+|-|\*|\/|\(|\)|\{|\}|\[|\]|;|,|\.|\"|\')/);
       let inDoubleQuote = false;
       let inSingleQuote = false;
-      
+
       const lineSpan = words.map((token, wIdx) => {
         if (token === '"') {
           inDoubleQuote = !inDoubleQuote;
@@ -474,7 +478,7 @@ export default function PublicSharePage() {
       return (
         <div className="flex flex-col space-y-4 items-center w-full">
           <div className="flex items-center space-x-3 bg-slate-900 border border-slate-800 rounded-lg px-4 py-1.5 text-xs text-slate-300">
-            <button 
+            <button
               onClick={() => setZoom(z => Math.max(0.25, z - 0.25))}
               disabled={zoom <= 0.25}
               className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -483,7 +487,7 @@ export default function PublicSharePage() {
               <ZoomOut className="h-4 w-4" />
             </button>
             <span className="font-mono min-w-[48px] text-center">{Math.round(zoom * 100)}%</span>
-            <button 
+            <button
               onClick={() => setZoom(z => Math.min(3, z + 0.25))}
               disabled={zoom >= 3.0}
               className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -492,13 +496,13 @@ export default function PublicSharePage() {
               <ZoomIn className="h-4 w-4" />
             </button>
             <div className="h-4 w-px bg-slate-800"></div>
-            <button 
+            <button
               onClick={() => setRotation(r => (r + 90) % 360)}
               className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
             >
               <RotateCw className="h-4 w-4" />
             </button>
-            <button 
+            <button
               onClick={() => { setZoom(1); setRotation(0); }}
               className="p-1 hover:bg-slate-800 rounded text-[10px] text-slate-400 hover:text-white font-semibold transition-colors"
             >
@@ -507,17 +511,17 @@ export default function PublicSharePage() {
           </div>
 
           <div className="w-full flex items-center justify-center p-6 bg-slate-950/60 rounded-xl border border-slate-800 overflow-auto max-h-[50vh] min-h-[250px] relative">
-            <div 
-              className="absolute inset-0 opacity-[0.03] pointer-events-none" 
+            <div
+              className="absolute inset-0 opacity-[0.03] pointer-events-none"
               style={{
                 backgroundImage: 'conic-gradient(#ffffff 0.25turn, #000000 0.25turn 0.5turn, #ffffff 0.5turn 0.75turn, #000000 0.75turn)',
                 backgroundSize: '24px 24px'
               }}
             />
-            <img 
-              src={file.content} 
-              alt={file.name} 
-              className="max-w-full max-h-[45vh] object-contain rounded shadow-lg transition-transform duration-250 ease-out" 
+            <img
+              src={file.content}
+              alt={file.name}
+              className="max-w-full max-h-[45vh] object-contain rounded shadow-lg transition-transform duration-250 ease-out"
               style={{ transform: `scale(${zoom}) rotate(${rotation}deg)` }}
             />
           </div>
@@ -530,8 +534,8 @@ export default function PublicSharePage() {
     if (isAudio) {
       return (
         <div className="flex flex-col items-center justify-center p-6 bg-slate-900/40 rounded-xl border border-slate-800 text-center space-y-5">
-          <audio 
-            ref={audioRef} 
+          <audio
+            ref={audioRef}
             src={mediaUrl}
             onTimeUpdate={() => audioRef.current && setCurrentTime(audioRef.current.currentTime)}
             onLoadedMetadata={() => audioRef.current && setDuration(audioRef.current.duration)}
@@ -552,7 +556,7 @@ export default function PublicSharePage() {
           <div className="w-full max-w-sm space-y-3 bg-slate-950/50 border border-slate-850 rounded-lg p-3.5">
             <div className="flex items-center space-x-3 text-xs">
               <span className="font-mono text-slate-400 w-10 text-right">{formatTime(currentTime)}</span>
-              <input 
+              <input
                 type="range"
                 min={0}
                 max={duration || 100}
@@ -611,7 +615,7 @@ export default function PublicSharePage() {
     const isCSV = file.extension === 'csv' || file.extension === 'tsv' || file.mimeType === 'text/csv' || file.mimeType === 'text/tab-separated-values';
     if (isCSV && file.content) {
       const { headers, rows } = parseCSV(file.content);
-      const filteredRows = rows.filter(row => 
+      const filteredRows = rows.filter(row =>
         row.some(cell => cell.toLowerCase().includes(csvSearch.toLowerCase()))
       );
       const totalPages = Math.ceil(filteredRows.length / csvRowsPerPage);
@@ -625,10 +629,10 @@ export default function PublicSharePage() {
               <span>Spreadsheet Grid Viewer</span>
               <span className="text-[10px] text-slate-400 font-mono font-normal">({filteredRows.length} rows)</span>
             </div>
-            
+
             <div className="relative">
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-500" />
-              <input 
+              <input
                 type="text"
                 placeholder="Search..."
                 value={csvSearch}
@@ -779,7 +783,7 @@ export default function PublicSharePage() {
           </div>
           <h1 className="text-base font-bold text-white">Access Link Unusable</h1>
           <p className="mt-2 text-xs text-slate-400 leading-relaxed">{errorMsg}</p>
-          <button 
+          <button
             onClick={() => router.push('/sign-in')}
             className="mt-5 w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-750 transition-all"
           >
@@ -800,7 +804,7 @@ export default function PublicSharePage() {
           </div>
           <h1 className="text-base font-bold text-white">{linkLabel}</h1>
           <p className="mt-1.5 text-xs text-slate-400">This share link is password-protected. Enter the password below to decrypt and view the shared {itemType}.</p>
-          
+
           <form onSubmit={handlePasswordSubmit} className="mt-5 space-y-3">
             <div className="relative">
               <Key className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
@@ -891,7 +895,7 @@ export default function PublicSharePage() {
                   <p className="text-xs text-slate-400 mt-1">{currentFolder.description}</p>
                 )}
               </div>
-              
+
               {!allowDownload && (
                 <span className="flex items-center space-x-1 text-[10px] bg-amber-950/80 border border-amber-900 text-amber-400 px-2 py-1 rounded">
                   <Lock className="h-3 w-3" />
@@ -923,8 +927,8 @@ export default function PublicSharePage() {
 
                 {/* Subfolders list */}
                 {folderFolders.map((sub: VantorFolder) => (
-                  <div 
-                    key={sub.id} 
+                  <div
+                    key={sub.id}
                     onClick={() => handleOpenSubfolder(sub.id)}
                     className="grid grid-cols-12 px-6 py-3 items-center hover:bg-slate-800/30 cursor-pointer text-xs"
                   >
@@ -941,8 +945,8 @@ export default function PublicSharePage() {
 
                 {/* Files list */}
                 {folderFiles.map((f: VantorFile) => (
-                  <div 
-                    key={f.id} 
+                  <div
+                    key={f.id}
                     onClick={() => setPreviewFile(f)}
                     className="grid grid-cols-12 px-6 py-3 items-center hover:bg-slate-800/30 cursor-pointer text-xs"
                   >
@@ -1014,7 +1018,7 @@ export default function PublicSharePage() {
                 </button>
               </div>
             </div>
-            
+
             <div className="p-6 overflow-y-auto flex-1 bg-[#060a17] text-center">
               {renderSharedFilePreview(previewFile)}
             </div>
