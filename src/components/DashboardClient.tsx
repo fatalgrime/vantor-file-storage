@@ -1875,29 +1875,31 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                 {/* Info Content */}
                 <div className="space-y-3 text-xs text-slate-300 leading-relaxed font-sans font-medium">
                   <p>
-                    Vantor Storage is a centralized, high-security cloud asset management workspace. It provides secure file distribution, access controls, detailed change logging, and versioning for digital content across authorized repositories.
+                    Vantor Storage is a centralized, secure storage and asset management platform designed for viewing, sharing, organizing, and storing files, folders, and all Vantor assets in one place.
                   </p>
                   <p>
-                    This console operates under rigid encryption protocols and restricts document sharing according to role-based access control policies. Unauthorized use or data exfiltration is strictly prohibited.
+                    Users must comply with all applicable federal and state laws, as well as Vantor policies, while using this system. All activity is subject to monitoring for security, compliance, and access control purposes. Unauthorized access, misuse, or attempted data exfiltration is strictly prohibited and will result in disciplinary action and/or legal consequences.
                   </p>
                 </div>
 
                 {/* Technical Contact Section */}
-                <div className="rounded-lg border border-blue-950 bg-blue-950/40 p-4 space-y-2 font-sans">
-                  <h3 className="text-xs font-bold text-blue-300 flex items-center space-x-1.5 uppercase tracking-wide">
-                    <Mail className="h-3.5 w-3.5" />
-                    <span>Technical Support & Administration</span>
-                  </h3>
-                  <div className="text-xs text-slate-300">
-                    <div className="font-semibold text-white">Department of Information Technology</div>
-                    <a
-                      href="mailto:it@vantor.group"
-                      className="text-blue-400 hover:text-blue-300 hover:underline transition-colors mt-0.5 inline-block font-mono"
-                    >
-                      it@vantor.group
-                    </a>
+                {canManagePlatform && (
+                  <div className="rounded-lg border border-blue-950 bg-blue-950/40 p-4 space-y-2 font-sans">
+                    <h3 className="text-xs font-bold text-blue-300 flex items-center space-x-1.5 uppercase tracking-wide">
+                      <Mail className="h-3.5 w-3.5" />
+                      <span>Technical Support & Administration</span>
+                    </h3>
+                    <div className="text-xs text-slate-300">
+                      <div className="font-semibold text-white">Department of Information Technology</div>
+                      <a
+                        href="mailto:it@vantor.group"
+                        className="text-blue-400 hover:text-blue-300 hover:underline transition-colors mt-0.5 inline-block font-mono"
+                      >
+                        it@vantor.group
+                      </a>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Footer Action */}
                 <div className="flex justify-end pt-2">
