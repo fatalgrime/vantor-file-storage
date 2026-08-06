@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  X, 
-  Lock, 
-  Globe, 
-  Users, 
-  ShieldAlert, 
-  Check, 
-  UserPlus, 
+import {
+  X,
+  Lock,
+  Globe,
+  Users,
+  ShieldAlert,
+  Check,
+  UserPlus,
   Trash2,
   Link as LinkIcon,
   Calendar,
@@ -114,16 +114,16 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
   // Share Links Handlers
   const handleCreateShareLink = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Generate unique random share link ID
     const shareId = 'share-' + Math.random().toString(36).substring(2, 11) + Math.random().toString(36).substring(2, 11);
-    
+
     let expiresAt: string | undefined = undefined;
     const now = Date.now();
-    if (expirationType === '1h') expiresAt = new Date(now + 60*60*1000).toISOString();
-    else if (expirationType === '1d') expiresAt = new Date(now + 24*60*60*1000).toISOString();
-    else if (expirationType === '7d') expiresAt = new Date(now + 7*24*60*60*1000).toISOString();
-    else if (expirationType === '30d') expiresAt = new Date(now + 30*24*60*60*1000).toISOString();
+    if (expirationType === '1h') expiresAt = new Date(now + 60 * 60 * 1000).toISOString();
+    else if (expirationType === '1d') expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString();
+    else if (expirationType === '7d') expiresAt = new Date(now + 7 * 24 * 60 * 60 * 1000).toISOString();
+    else if (expirationType === '30d') expiresAt = new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString();
     else if (expirationType === 'custom' && customExpirationDate) {
       expiresAt = new Date(customExpirationDate).toISOString();
     }
@@ -150,7 +150,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
       title: 'Share link generated',
       message: `Created secure share link "${newLink.label}".`,
     });
-    
+
     // Reset Form
     setLinkLabel('');
     setAllowDownload(true);
@@ -211,31 +211,28 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
         <div className="flex border-b border-[#1e3059] bg-[#080e20] text-xs font-semibold flex-shrink-0">
           <button
             onClick={() => setActiveTab('policy')}
-            className={`px-5 py-3 border-b-2 transition-all ${
-              activeTab === 'policy'
-                ? 'border-blue-500 text-blue-400 bg-blue-950/20'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            className={`px-5 py-3 border-b-2 transition-all ${activeTab === 'policy'
+              ? 'border-blue-500 text-blue-400 bg-blue-950/20'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
           >
             General Policy
           </button>
           <button
             onClick={() => setActiveTab('share')}
-            className={`px-5 py-3 border-b-2 transition-all ${
-              activeTab === 'share'
-                ? 'border-blue-500 text-blue-400 bg-blue-950/20'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            className={`px-5 py-3 border-b-2 transition-all ${activeTab === 'share'
+              ? 'border-blue-500 text-blue-400 bg-blue-950/20'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
           >
             Collaborators
           </button>
           <button
             onClick={() => setActiveTab('links')}
-            className={`px-5 py-3 border-b-2 transition-all ${
-              activeTab === 'links'
-                ? 'border-blue-500 text-blue-400 bg-blue-950/20'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            className={`px-5 py-3 border-b-2 transition-all ${activeTab === 'links'
+              ? 'border-blue-500 text-blue-400 bg-blue-950/20'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
           >
             Shareable Links
           </button>
@@ -249,11 +246,10 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                 <div className="space-y-2">
                   <div
                     onClick={() => setPermissionLevel('public')}
-                    className={`flex items-start space-x-3 rounded-lg border p-3 cursor-pointer transition-all ${
-                      permissionLevel === 'public'
-                        ? 'border-blue-500 bg-blue-950/40 ring-1 ring-blue-500/50'
-                        : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
-                    }`}
+                    className={`flex items-start space-x-3 rounded-lg border p-3 cursor-pointer transition-all ${permissionLevel === 'public'
+                      ? 'border-blue-500 bg-blue-950/40 ring-1 ring-blue-500/50'
+                      : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
+                      }`}
                   >
                     <Globe className="h-5 w-5 text-emerald-400 mt-0.5 flex-shrink-0" />
                     <div>
@@ -264,11 +260,10 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
 
                   <div
                     onClick={() => setPermissionLevel('authenticated')}
-                    className={`flex items-start space-x-3 rounded-lg border p-3 cursor-pointer transition-all ${
-                      permissionLevel === 'authenticated'
-                        ? 'border-blue-500 bg-blue-950/40 ring-1 ring-blue-500/50'
-                        : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
-                    }`}
+                    className={`flex items-start space-x-3 rounded-lg border p-3 cursor-pointer transition-all ${permissionLevel === 'authenticated'
+                      ? 'border-blue-500 bg-blue-950/40 ring-1 ring-blue-500/50'
+                      : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
+                      }`}
                   >
                     <Users className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
                     <div>
@@ -279,11 +274,10 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
 
                   <div
                     onClick={() => setPermissionLevel('role_restricted')}
-                    className={`flex items-start space-x-3 rounded-lg border p-3 cursor-pointer transition-all ${
-                      permissionLevel === 'role_restricted'
-                        ? 'border-blue-500 bg-blue-950/40 ring-1 ring-blue-500/50'
-                        : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
-                    }`}
+                    className={`flex items-start space-x-3 rounded-lg border p-3 cursor-pointer transition-all ${permissionLevel === 'role_restricted'
+                      ? 'border-blue-500 bg-blue-950/40 ring-1 ring-blue-500/50'
+                      : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
+                      }`}
                   >
                     <ShieldAlert className="h-5 w-5 text-amber-400 mt-0.5 flex-shrink-0" />
                     <div>
@@ -294,11 +288,10 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
 
                   <div
                     onClick={() => setPermissionLevel('admin_only')}
-                    className={`flex items-start space-x-3 rounded-lg border p-3 cursor-pointer transition-all ${
-                      permissionLevel === 'admin_only'
-                        ? 'border-blue-500 bg-blue-950/40 ring-1 ring-blue-500/50'
-                        : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
-                    }`}
+                    className={`flex items-start space-x-3 rounded-lg border p-3 cursor-pointer transition-all ${permissionLevel === 'admin_only'
+                      ? 'border-blue-500 bg-blue-950/40 ring-1 ring-blue-500/50'
+                      : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
+                      }`}
                   >
                     <Lock className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
                     <div>
@@ -320,11 +313,10 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                           key={role}
                           type="button"
                           onClick={() => handleToggleRole(role)}
-                          className={`flex items-center space-x-2 rounded-lg border p-2 text-xs font-mono transition-colors ${
-                            isChecked
-                              ? 'border-blue-500 bg-blue-950/60 text-blue-300'
-                              : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-slate-200'
-                          }`}
+                          className={`flex items-center space-x-2 rounded-lg border p-2 text-xs font-mono transition-colors ${isChecked
+                            ? 'border-blue-500 bg-blue-950/60 text-blue-300'
+                            : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-slate-200'
+                            }`}
                         >
                           <div className={`h-4 w-4 rounded border flex items-center justify-center ${isChecked ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-700'}`}>
                             {isChecked && <Check className="h-3 w-3" />}
@@ -407,11 +399,10 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                           <span className="block text-[10px] text-slate-400 truncate">{c.email}</span>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${
-                            c.role === 'editor'
-                              ? 'bg-blue-950 border border-blue-800 text-blue-300'
-                              : 'bg-slate-900 border border-slate-800 text-slate-300'
-                          }`}>
+                          <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${c.role === 'editor'
+                            ? 'bg-blue-950 border border-blue-800 text-blue-300'
+                            : 'bg-slate-900 border border-slate-800 text-slate-300'
+                            }`}>
                             {c.role}
                           </span>
                           <button
@@ -442,10 +433,10 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                   </h4>
                   <span className="text-[11px] text-slate-400 font-mono">Public / Protected URL</span>
                 </div>
-                
+
                 <div className="space-y-1.5">
                   <label className="block text-xs font-semibold text-slate-300">Link Name / Label *</label>
-                  <input 
+                  <input
                     type="text"
                     required
                     placeholder="e.g. Client Review, External Partner Access"
@@ -491,7 +482,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                 {expirationType === 'custom' && (
                   <div className="space-y-1.5">
                     <label className="block text-xs font-semibold text-slate-300">Custom Expiration Date & Time</label>
-                    <input 
+                    <input
                       type="datetime-local"
                       required
                       value={customExpirationDate}
@@ -504,7 +495,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                 {/* Password Protection */}
                 <div className="space-y-3 pt-3 border-t border-slate-800/80">
                   <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-                    <input 
+                    <input
                       type="checkbox"
                       checked={usePassword}
                       onChange={(e) => setUsePassword(e.target.checked)}
@@ -515,7 +506,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                   {usePassword && (
                     <div className="relative">
                       <Key className="absolute left-3 top-2.5 h-3.5 w-3.5 text-amber-400" />
-                      <input 
+                      <input
                         type="password"
                         required
                         placeholder="Set required passcode to access link..."
@@ -587,20 +578,18 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                                 <Key className="h-2.5 w-2.5 mr-1" /> Password Protected
                               </span>
                             )}
-                            <span className={`px-2 py-0.5 rounded-md font-medium ${
-                              link.allowDownload 
-                                ? 'bg-emerald-950/80 border border-emerald-800 text-emerald-300' 
-                                : 'bg-slate-900 border border-slate-800 text-slate-400'
-                            }`}>
+                            <span className={`px-2 py-0.5 rounded-md font-medium ${link.allowDownload
+                              ? 'bg-emerald-950/80 border border-emerald-800 text-emerald-300'
+                              : 'bg-slate-900 border border-slate-800 text-slate-400'
+                              }`}>
                               {link.allowDownload ? 'Read & Download' : 'View Only'}
                             </span>
-                            <span className={`px-2 py-0.5 rounded-md font-medium flex items-center ${
-                              isExpired 
-                                ? 'bg-red-950 border border-red-850 text-red-300' 
-                                : 'bg-slate-900 border border-slate-800 text-slate-400'
-                            }`}>
+                            <span className={`px-2 py-0.5 rounded-md font-medium flex items-center ${isExpired
+                              ? 'bg-red-950 border border-red-850 text-red-300'
+                              : 'bg-slate-900 border border-slate-800 text-slate-400'
+                              }`}>
                               <Calendar className="h-2.5 w-2.5 mr-1" />
-                              {link.expiresAt 
+                              {link.expiresAt
                                 ? (isExpired ? 'Expired' : `Expires: ${new Date(link.expiresAt).toLocaleDateString()}`)
                                 : 'Never Expires'}
                             </span>

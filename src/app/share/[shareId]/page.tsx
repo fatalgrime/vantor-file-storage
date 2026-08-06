@@ -31,7 +31,8 @@ import {
   FileText as FileIcon,
   Check,
   Copy,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  AlertCircle
 } from 'lucide-react';
 import { VantorFile, VantorFolder, ShareLink } from '../../../lib/types';
 import { PdfViewer } from '../../../components/PdfViewer';
@@ -108,12 +109,17 @@ export default function PublicSharePage() {
         throw new Error(payload?.error || 'Failed to retrieve share contents.');
       }
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
-      if (data.passwordRequired) {
+      if (data?.passwordRequired) {
         setPasswordRequired(true);
         setLinkLabel(data.label || 'Secure Link');
         setItemType(data.itemType);
+        if (enteredPassword || data?.error || !res.ok) {
+          setAuthError(data?.error || 'Incorrect password. Please try again.');
+        } else {
+          setAuthError('');
+        }
         setLoading(false);
         return;
       }
@@ -203,10 +209,13 @@ export default function PublicSharePage() {
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
-    if (!password.trim()) return;
+    if (!password.trim()) {
+      setAuthError('Please enter a password to decrypt this file.');
+      return;
+    }
 
     // Test login
-    fetchShareData(password);
+    fetchShareData(password.trim());
   };
 
   // Download Trigger
@@ -810,19 +819,28 @@ export default function PublicSharePage() {
               <Key className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
               <input
                 type="password"
-                required
-                placeholder="Enter password..."
+                placeholder="Enter password to decrypt..."
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-slate-800 bg-slate-900 pl-10 pr-3 py-2 text-xs text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (authError) setAuthError('');
+                }}
+                className={`w-full rounded-lg border bg-slate-900 pl-10 pr-3 py-2 text-xs text-white outline-none transition-colors ${
+                  authError 
+                    ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500' 
+                    : 'border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
+                }`}
               />
             </div>
             {authError && (
-              <p className="text-[11px] text-red-400 font-medium text-left">{authError}</p>
+              <div className="flex items-center space-x-2 rounded-lg border border-red-900/60 bg-red-950/50 px-3 py-2 text-[11px] text-red-300 font-medium text-left shadow-sm">
+                <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0" />
+                <span>{authError}</span>
+              </div>
             )}
             <button
               type="submit"
-              className="w-full rounded-lg bg-blue-600 hover:bg-blue-500 py-2 text-xs font-semibold text-white transition-all shadow-glow-blue"
+              className="w-full rounded-lg bg-blue-600 hover:bg-blue-500 py-2.5 text-xs font-bold text-white transition-all shadow-glow-blue"
             >
               Unlock Shared Asset
             </button>

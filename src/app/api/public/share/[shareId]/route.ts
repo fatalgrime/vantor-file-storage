@@ -65,11 +65,13 @@ export async function GET(
     const passwordMatches = link.password === passwordQuery;
 
     if (hasPassword && !passwordMatches) {
+      const isIncorrectPassword = Boolean(passwordQuery);
       return NextResponse.json({
         passwordRequired: true,
         label: link.label,
         itemType: link.itemType,
-      });
+        error: isIncorrectPassword ? 'Incorrect password. Please try again.' : undefined,
+      }, { status: isIncorrectPassword ? 401 : 200 });
     }
 
     // Fetch targets
