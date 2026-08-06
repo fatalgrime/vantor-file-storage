@@ -217,12 +217,10 @@ export default function PublicSharePage() {
     e.preventDefault();
     setAuthError('');
     if (!password.trim()) {
-      const msg = 'Please enter a password to decrypt this file.';
-      setAuthError(msg);
       addToast({
         type: 'warning',
         title: 'Password Required',
-        message: msg,
+        message: 'Please enter a password to decrypt this file.',
       });
       return;
     }
@@ -844,12 +842,6 @@ export default function PublicSharePage() {
                   }`}
               />
             </div>
-            {authError && (
-              <div className="flex items-center space-x-2 rounded-lg border border-red-900/60 bg-red-950/50 px-3 py-2 text-[11px] text-red-300 font-medium text-left shadow-sm">
-                <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0" />
-                <span>{authError}</span>
-              </div>
-            )}
             <button
               type="submit"
               className="w-full rounded-lg bg-blue-600 hover:bg-blue-500 py-2.5 text-xs font-bold text-white transition-all shadow-glow-blue"
