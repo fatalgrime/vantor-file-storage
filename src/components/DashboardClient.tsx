@@ -84,6 +84,7 @@ type AppDialog =
     type: 'move';
     item: VantorFile | VantorFolder;
     isFolder: boolean;
+    destinationRepositoryId: string;
     destinationFolderId: string;
   }
   | {
@@ -1036,11 +1037,16 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     return '/' + path.join('/');
   };
 
-  const getMoveDestinations = (item: VantorFile | VantorFolder, isFolder: boolean) => {
-    const repoId = item.repositoryId || DEFAULT_REPOSITORY_ID;
+  const getMoveDestinations = (item: VantorFile | VantorFolder, isFolder: boolean, targetRepoId?: string) => {
+    const repoId = targetRepoId || item.repositoryId || DEFAULT_REPOSITORY_ID;
     const repoFolders = folders.filter((f) => (f.repositoryId || DEFAULT_REPOSITORY_ID) === repoId);
 
     if (!isFolder) {
+      return repoFolders;
+    }
+
+    const itemRepoId = item.repositoryId || DEFAULT_REPOSITORY_ID;
+    if (itemRepoId !== repoId) {
       return repoFolders;
     }
 
@@ -1077,6 +1083,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
       type: 'move',
       item,
       isFolder,
+      destinationRepositoryId: repositoryId,
       destinationFolderId: currentParentId || 'root',
     });
   };
@@ -1085,44 +1092,83 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     if (!dialog || dialog.type !== 'move') return;
 
     const destId = dialog.destinationFolderId === 'root' ? null : dialog.destinationFolderId;
+    const targetRepoId = dialog.destinationRepositoryId;
+    const targetRepo = repositories.find((r) => r.id === targetRepoId) || currentRepository;
+
     const destFolder = destId ? folders.find((f) => f.id === destId) : null;
-    const repositoryId = 'repositoryId' in dialog.item ? dialog.item.repositoryId || DEFAULT_REPOSITORY_ID : DEFAULT_REPOSITORY_ID;
-    const repository = repositories.find((candidate) => candidate.id === repositoryId) || currentRepository;
 
     const hasDestWriteAccess = destFolder
-      ? canEditItem(effectiveRole, currentUserId, destFolder, folders, repository)
-      : (repository ? canEditRepository(repository) : false);
+      ? canEditItem(effectiveRole, currentUserId, destFolder, folders, targetRepo)
+      : (targetRepo ? canEditRepository(targetRepo) : false);
 
     if (!hasDestWriteAccess) {
-      addToast({ type: 'error', title: 'Access denied', message: 'You do not have editor permissions in the destination folder.' });
+      addToast({ type: 'error', title: 'Access denied', message: 'You do not have editor permissions in the destination location.' });
       return;
     }
+
     const isFolder = dialog.isFolder;
     const item = dialog.item;
+    const destName = destFolder ? destFolder.name : 'Root';
+    const oldRepoId = 'repositoryId' in item ? item.repositoryId || DEFAULT_REPOSITORY_ID : DEFAULT_REPOSITORY_ID;
 
     if (isFolder) {
-      const destFolder = destId ? folders.find((f) => f.id === destId) : null;
-      const destName = destFolder ? destFolder.name : 'Root';
+      const descendantFolderIds = new Set<string>();
+      const findDescendants = (fId: string) => {
+        folders.forEach((f) => {
+          if (f.parentId === fId) {
+            descendantFolderIds.add(f.id);
+            findDescendants(f.id);
+          }
+        });
+      };
+      findDescendants(item.id);
 
-      const nextFolders = folders.map((f) =>
-        f.id === item.id ? { ...f, parentId: destId } : f
-      );
-      const nextRepositories = touchRepository((item as VantorFolder).repositoryId || DEFAULT_REPOSITORY_ID);
-      const nextLogs = [createAuditLog('METADATA_UPDATE', item.name, 'folder', `Moved folder to "${destName}"`), ...auditLogs];
+      const nextFolders = folders.map((f) => {
+        if (f.id === item.id) return { ...f, parentId: destId, repositoryId: targetRepoId };
+        if (descendantFolderIds.has(f.id)) return { ...f, repositoryId: targetRepoId };
+        return f;
+      });
+
+      const nextFiles = files.map((f) => {
+        if (f.folderId && (f.folderId === item.id || descendantFolderIds.has(f.folderId))) {
+          return { ...f, repositoryId: targetRepoId };
+        }
+        return f;
+      });
+
+      let nextRepositories = touchRepository(oldRepoId);
+      if (oldRepoId !== targetRepoId) {
+        nextRepositories = nextRepositories.map((r) =>
+          r.id === targetRepoId ? { ...r, updatedAt: getUpdatedLabel() } : r
+        );
+      }
+
+      const logMsg = oldRepoId !== targetRepoId
+        ? `Moved folder to repository "${targetRepo?.name || 'Target'}" (${destName})`
+        : `Moved folder to "${destName}"`;
+      const nextLogs = [createAuditLog('METADATA_UPDATE', item.name, 'folder', logMsg), ...auditLogs];
 
       setFolders(nextFolders);
+      setFiles(nextFiles);
       setAuditLogs(nextLogs);
       setRepositories(nextRepositories);
-      persistState({ folders: nextFolders, auditLogs: nextLogs, repositories: nextRepositories }).catch((error) => setLoadError(error.message));
+      persistState({ folders: nextFolders, files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories }).catch((error) => setLoadError(error.message));
     } else {
-      const destFolder = destId ? folders.find((f) => f.id === destId) : null;
-      const destName = destFolder ? destFolder.name : 'Root';
-
       const nextFiles = files.map((f) =>
-        f.id === item.id ? { ...f, folderId: destId } : f
+        f.id === item.id ? { ...f, folderId: destId, repositoryId: targetRepoId } : f
       );
-      const nextRepositories = touchRepository((item as VantorFile).repositoryId || DEFAULT_REPOSITORY_ID);
-      const nextLogs = [createAuditLog('METADATA_UPDATE', item.name, 'file', `Moved file to "${destName}"`), ...auditLogs];
+
+      let nextRepositories = touchRepository(oldRepoId);
+      if (oldRepoId !== targetRepoId) {
+        nextRepositories = nextRepositories.map((r) =>
+          r.id === targetRepoId ? { ...r, updatedAt: getUpdatedLabel() } : r
+        );
+      }
+
+      const logMsg = oldRepoId !== targetRepoId
+        ? `Moved file to repository "${targetRepo?.name || 'Target'}" (${destName})`
+        : `Moved file to "${destName}"`;
+      const nextLogs = [createAuditLog('METADATA_UPDATE', item.name, 'file', logMsg), ...auditLogs];
 
       setFiles(nextFiles);
       setAuditLogs(nextLogs);
@@ -1131,7 +1177,11 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     }
 
     setDialog(null);
-    addToast({ type: 'success', title: 'Item moved', message: `Moved "${item.name}" successfully.` });
+    addToast({
+      type: 'success',
+      title: 'Item moved',
+      message: `Moved "${item.name}" to ${targetRepo?.name || 'repository'} successfully.`,
+    });
   };
 
   const handleSavePermissions = (
@@ -1372,13 +1422,13 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                           ]);
                           const recentRepositoryLogs = auditLogs.filter((log) => repositoryItemNames.has(log.targetName)).slice(0, 2);
                           const latestChange = recentRepositoryLogs[0]?.details || 'No recent changes';
-                          const isActive = repository.id === currentRepositoryId;
+                          const isActive = (repository as any).status !== 'inactive' && (repository as any).status !== 'archived' && (repository as any).isActive !== false;
 
                           return (
                             <tr 
                               key={repository.id}
                               onClick={() => handleSelectRepository(repository.id)}
-                              className={`hover:bg-slate-800/20 cursor-pointer ${isActive ? 'bg-blue-950/15' : ''}`}
+                              className="hover:bg-slate-800/20 cursor-pointer"
                             >
                               <td className="px-4 py-3 font-semibold text-white flex items-center space-x-2">
                                 <span className="truncate">{repository.name}</span>
@@ -1427,16 +1477,13 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                       ]);
                       const recentRepositoryLogs = auditLogs.filter((log) => repositoryItemNames.has(log.targetName)).slice(0, 2);
                       const latestChange = recentRepositoryLogs[0]?.details || 'No recent changes';
-                      const isActive = repository.id === currentRepositoryId;
+                      const isActive = (repository as any).status !== 'inactive' && (repository as any).status !== 'archived' && (repository as any).isActive !== false;
 
                       return (
                         <button
                           key={repository.id}
                           onClick={() => handleSelectRepository(repository.id)}
-                          className={`rounded-lg border p-4 text-left transition-colors ${isActive
-                            ? 'border-blue-500 bg-blue-950/30'
-                            : 'border-[#1e3059] bg-[#070c18] hover:border-blue-700/80'
-                            }`}
+                          className="rounded-lg border border-[#1e3059] bg-[#070c18] hover:border-blue-700/80 p-4 text-left transition-colors"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
@@ -1746,22 +1793,43 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                 )}
 
                 {dialog.type === 'move' && (
-                  <label className="block text-xs font-semibold text-slate-300">
-                    Destination Folder
-                    <select
-                      autoFocus
-                      value={dialog.destinationFolderId}
-                      onChange={(event) => setDialog({ ...dialog, destinationFolderId: event.target.value })}
-                      className="mt-1.5 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs text-white outline-none focus:border-blue-500"
-                    >
-                      <option value="root">/ (Repository Root)</option>
-                      {getMoveDestinations(dialog.item, dialog.isFolder).map((folder) => (
-                        <option key={folder.id} value={folder.id}>
-                          {getFolderPathString(folder, folders)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="space-y-3">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Target Repository
+                      <select
+                        autoFocus
+                        value={dialog.destinationRepositoryId}
+                        onChange={(event) => setDialog({
+                          ...dialog,
+                          destinationRepositoryId: event.target.value,
+                          destinationFolderId: 'root'
+                        })}
+                        className="mt-1.5 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs text-white outline-none focus:border-blue-500"
+                      >
+                        {visibleRepositories.map((repo) => (
+                          <option key={repo.id} value={repo.id}>
+                            {repo.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Destination Folder
+                      <select
+                        value={dialog.destinationFolderId}
+                        onChange={(event) => setDialog({ ...dialog, destinationFolderId: event.target.value })}
+                        className="mt-1.5 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs text-white outline-none focus:border-blue-500"
+                      >
+                        <option value="root">/ (Repository Root)</option>
+                        {getMoveDestinations(dialog.item, dialog.isFolder, dialog.destinationRepositoryId).map((folder) => (
+                          <option key={folder.id} value={folder.id}>
+                            {getFolderPathString(folder, folders)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
                 )}
               </div>
             )}
