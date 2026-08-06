@@ -15,7 +15,8 @@ import {
   Sparkles,
   Trash2,
   HelpCircle,
-  RefreshCw
+  RefreshCw,
+  ChevronDown
 } from 'lucide-react';
 import { UserButton, useUser, SignInButton } from '@clerk/nextjs';
 import { UserRole } from '../lib/types';
@@ -252,11 +253,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="relative">
             <button
               onClick={() => setIsShareDropdownOpen(!isShareDropdownOpen)}
-              className={`flex items-center space-x-1 text-xs font-medium border px-2.5 py-1 rounded-md transition-colors ${isDark ? 'text-slate-300 bg-slate-900/90 border-slate-800 hover:border-slate-700' : 'text-gray-600 bg-white border-gray-200 hover:border-gray-300'}`}
+              className={`flex items-center space-x-1.5 text-xs font-medium border px-3 py-1.5 rounded-md transition-colors ${isDark ? 'text-slate-300 bg-slate-900/90 border-slate-800 hover:border-slate-700' : 'text-gray-600 bg-white border-gray-200 hover:border-gray-300'}`}
             >
               <Lock className="h-3 w-3 text-blue-400" />
               <span>Public share</span>
-              <span className={`ml-1 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>▼</span>
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isShareDropdownOpen ? 'rotate-180' : ''} ${isDark ? 'text-slate-400' : 'text-gray-400'}`} />
             </button>
 
             {isShareDropdownOpen && (
@@ -287,7 +288,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className={`appearance-none border text-xs font-medium rounded-md px-2.5 py-1 pr-6 cursor-pointer focus:outline-none focus:border-blue-500 transition-colors ${isDark
+              className={`border text-xs font-medium rounded-md px-3 py-1.5 cursor-pointer focus:outline-none focus:border-blue-500 transition-colors ${isDark
                 ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
                 : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
                 }`}
@@ -300,7 +301,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <option value="JSON Document">JSON / Configs</option>
               <option value="ZIP Archive">Archives</option>
             </select>
-            <SlidersHorizontal className={`h-3 w-3 absolute right-2 top-1.5 pointer-events-none ${isDark ? 'text-slate-400' : 'text-gray-400'}`} />
           </div>
 
           {/* Modified Date Filter */}
@@ -308,7 +308,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <select
               value={modifiedFilter}
               onChange={(e) => setModifiedFilter(e.target.value)}
-              className={`appearance-none border text-xs font-medium rounded-md px-2.5 py-1 pr-6 cursor-pointer focus:outline-none focus:border-blue-500 transition-colors ${isDark
+              className={`border text-xs font-medium rounded-md px-3 py-1.5 cursor-pointer focus:outline-none focus:border-blue-500 transition-colors ${isDark
                 ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
                 : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
                 }`}
