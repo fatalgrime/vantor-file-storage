@@ -123,12 +123,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   const [managedUsers, setManagedUsers] = useState<VantorUser[]>([]);
   const [shares, setShares] = useState<ShareLink[]>([]);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [loggerFilter, setLoggerFilter] = useState<'ALL' | 'UPLOAD' | 'DELETE' | 'PERMISSION_CHANGE'>('ALL');
 
-  const filteredLogs = useMemo(() => {
-    if (loggerFilter === 'ALL') return auditLogs;
-    return auditLogs.filter(log => log.action === loggerFilter);
-  }, [auditLogs, loggerFilter]);
 
   const displayName = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Vantor User';
 
@@ -1243,20 +1238,6 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     return newLog;
   };
 
-  const getLogIcon = (action: AuditLog['action']) => {
-    switch (action) {
-      case 'UPLOAD':
-        return <Upload className="h-3 w-3 text-emerald-400" />;
-      case 'DELETE':
-        return <Trash2 className="h-3 w-3 text-rose-400" />;
-      case 'PERMISSION_CHANGE':
-        return <Key className="h-3 w-3 text-amber-400" />;
-      case 'FOLDER_CREATE':
-        return <Folder className="h-3 w-3 text-blue-400" />;
-      default:
-        return <Activity className="h-3 w-3 text-slate-400" />;
-    }
-  };
 
   if (!isMounted || !isLoaded) {
     return (
@@ -1324,9 +1305,6 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-          {/* Left Column: Repository Cards or File browser */}
-          <div className="lg:col-span-3 space-y-6">
             {showRepositoryIndex && (
               <section className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1592,94 +1570,6 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                 />
               </div>
             )}
-          </div>
-
-          {/* Right Column: Real-time Event Logger Feed */}
-          <div className="lg:col-span-1 space-y-4">
-            <div className={`rounded-xl border p-4 backdrop-blur-md shadow-2xl space-y-4 flex flex-col max-h-[600px] ${isDark ? 'border-[#1e3059] bg-[#070c18]/90' : 'border-gray-200 bg-white'}`}>
-              <div className="flex items-center justify-between border-b pb-2.5 border-slate-800">
-                <div className="flex items-center space-x-2">
-                  <Activity className="h-4.5 w-4.5 text-blue-400" />
-                  <span className="font-bold text-sm text-white">Audit Logs</span>
-                </div>
-              </div>
-
-              {/* Filter pills */}
-              <div className="flex flex-wrap gap-1 text-[10px]">
-                <button
-                  onClick={() => setLoggerFilter('ALL')}
-                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${loggerFilter === 'ALL' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setLoggerFilter('UPLOAD')}
-                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${loggerFilter === 'UPLOAD' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
-                >
-                  Uploads
-                </button>
-                <button
-                  onClick={() => setLoggerFilter('PERMISSION_CHANGE')}
-                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${loggerFilter === 'PERMISSION_CHANGE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
-                >
-                  Security
-                </button>
-                <button
-                  onClick={() => setLoggerFilter('DELETE')}
-                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${loggerFilter === 'DELETE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
-                >
-                  Deletes
-                </button>
-              </div>
-
-              {/* Scrollable list */}
-              <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 max-h-[420px] min-h-[150px]">
-                {filteredLogs.length === 0 ? (
-                  <div className="text-center py-10 text-xs text-slate-500">
-                    No events found in this category.
-                  </div>
-                ) : (
-                  filteredLogs.map((log) => (
-                    <div key={log.id} className="p-2.5 rounded bg-slate-950/40 border border-slate-900 text-xs space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-1.5">
-                          {getLogIcon(log.action)}
-                          <span className="font-mono text-[9px] text-slate-500">
-                            {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                          </span>
-                        </div>
-                        <span className="rounded bg-slate-900 px-1.5 py-0.5 text-[8px] font-semibold text-slate-400 uppercase tracking-wider">
-                          {log.role}
-                        </span>
-                      </div>
-                      <p className="text-slate-300 leading-normal text-[11px]">
-                        <span className="font-semibold text-white">{log.performedBy}</span> {log.action === 'UPLOAD' ? 'uploaded' : log.action === 'DELETE' ? 'deleted' : log.action === 'FOLDER_CREATE' ? 'created folder' : log.action === 'PERMISSION_CHANGE' ? 'updated permissions for' : 'changed'} <span className="text-blue-400 font-medium font-mono">{log.targetName}</span>
-                      </p>
-                      {log.details && (
-                        <p className="text-[10px] text-slate-500 italic font-sans truncate">
-                          {log.details}
-                        </p>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Clear logs button for admins */}
-              {canManagePlatform && auditLogs.length > 0 && (
-                <button
-                  onClick={() => {
-                    setAuditLogs([]);
-                    persistState({ auditLogs: [] }).catch((error) => setLoadError(error.message));
-                  }}
-                  className="w-full text-center py-1.5 rounded bg-red-950/10 hover:bg-red-950/30 border border-red-900/30 text-[10px] font-semibold text-red-400 transition-colors cursor-pointer"
-                >
-                  Clear Log Feed
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
       </main>
 
       {/* Footer Summary Bar */}
