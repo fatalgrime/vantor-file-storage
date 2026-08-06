@@ -61,6 +61,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   activeTabDefault = 'upload',
 }) => {
   const [activeTab, setActiveTab] = useState<'upload' | 'folder' | 'files' | 'logs' | 'users'>(activeTabDefault);
+  const [adminLogFilter, setAdminLogFilter] = useState<'ALL' | 'PERMISSION_CHANGE' | 'UPLOAD' | 'DELETE'>('ALL');
   const { addToast } = useToast();
 
   // Form states for New File Upload
@@ -268,7 +269,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               }`}
           >
             <Clock className="h-3.5 w-3.5" />
-            <span>Security Audit Logs</span>
+            <span>Audit Logs</span>
           </button>
 
           <button
@@ -569,8 +570,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </td>
                           <td className="px-3 py-3">
                             <span className={`rounded px-2 py-1 text-[10px] font-semibold uppercase ${managedUser.locked
-                                ? 'bg-red-950 text-red-300 border border-red-800'
-                                : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                              ? 'bg-red-950 text-red-300 border border-red-800'
+                              : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
                               }`}>
                               {managedUser.locked ? 'Locked' : 'Active'}
                             </span>
@@ -607,9 +608,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* 5. AUDIT LOGS TAB */}
           {activeTab === 'logs' && (
-            <div className="space-y-3 text-xs">
+            <div className="space-y-4 text-xs font-sans">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-slate-200">Security Audit Trail History ({auditLogs.length})</h4>
+                <h4 className="font-bold text-slate-200">Audit Trail History ({auditLogs.filter(log => adminLogFilter === 'ALL' || log.action === adminLogFilter).length})</h4>
                 {onClearAuditLogs && auditLogs.length > 0 && (
                   <button
                     onClick={onClearAuditLogs}
@@ -620,26 +621,66 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </button>
                 )}
               </div>
+
+              {/* Filter pills */}
+              <div className="flex flex-wrap gap-1 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => setAdminLogFilter('ALL')}
+                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'ALL' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminLogFilter('PERMISSION_CHANGE')}
+                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'PERMISSION_CHANGE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                >
+                  Security
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminLogFilter('UPLOAD')}
+                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'UPLOAD' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                >
+                  Uploads
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminLogFilter('DELETE')}
+                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'DELETE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                >
+                  Deletes
+                </button>
+              </div>
+
               <div className="space-y-2">
-                {auditLogs.map((log) => (
-                  <div key={log.id} className="flex items-start space-x-3 p-3 rounded-lg bg-slate-900/60 border border-slate-800">
-                    <div className="flex h-7 w-7 items-center justify-center rounded bg-slate-800 text-blue-400 font-mono text-[10px] font-bold flex-shrink-0">
-                      {log.action.substring(0, 3)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-white">{log.targetName}</span>
-                        <span className="text-[10px] text-slate-500 font-mono">{new Date(log.timestamp).toLocaleString()}</span>
+                {auditLogs
+                  .filter(log => adminLogFilter === 'ALL' || log.action === adminLogFilter)
+                  .map((log) => (
+                    <div key={log.id} className="flex items-start space-x-3 p-3 rounded-lg bg-slate-900/60 border border-slate-800">
+                      <div className="flex h-7 w-7 items-center justify-center rounded bg-slate-800 text-blue-400 font-mono text-[10px] font-bold flex-shrink-0">
+                        {log.action.substring(0, 3)}
                       </div>
-                      <p className="text-slate-300 text-[11px] mt-0.5">{log.details}</p>
-                      <div className="flex items-center space-x-2 mt-1 text-[10px] text-slate-400">
-                        <span>By: <strong className="text-blue-300">{log.performedBy}</strong></span>
-                        <span>•</span>
-                        <span className="uppercase font-mono text-slate-500">Role: {log.role}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-white">{log.targetName}</span>
+                          <span className="text-[10px] text-slate-500 font-mono">{new Date(log.timestamp).toLocaleString()}</span>
+                        </div>
+                        <p className="text-slate-300 text-[11px] mt-0.5">{log.details}</p>
+                        <div className="flex items-center space-x-2 mt-1 text-[10px] text-slate-400">
+                          <span>By: <strong className="text-blue-300">{log.performedBy}</strong></span>
+                          <span>•</span>
+                          <span className="uppercase font-mono text-slate-500">Role: {log.role}</span>
+                        </div>
                       </div>
                     </div>
+                  ))}
+                {auditLogs.filter(log => adminLogFilter === 'ALL' || log.action === adminLogFilter).length === 0 && (
+                  <div className="text-center py-10 text-xs text-slate-500">
+                    No events found in this category.
                   </div>
-                ))}
+                )}
               </div>
             </div>
           )}

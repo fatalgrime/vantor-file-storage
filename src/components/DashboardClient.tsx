@@ -633,9 +633,12 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         downloadsCount: 0,
       };
 
+      const log = createAuditLog('PERMISSION_CHANGE', item.name, 'parentId' in item ? 'folder' : 'file', 'Auto-generated quick share link');
+      const nextLogs = [log, ...auditLogs];
+      setAuditLogs(nextLogs);
       const nextShares = [...shares, newLink];
       setShares(nextShares);
-      await persistState({ shares: nextShares }).catch((error) => console.error(error));
+      await persistState({ shares: nextShares, auditLogs: nextLogs }).catch((error) => console.error(error));
     }
 
     const url = `${window.location.origin}/share/${linkId}`;
@@ -1204,7 +1207,10 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
 
   const handleSaveShares = (nextShares: ShareLink[]) => {
     setShares(nextShares);
-    persistState({ shares: nextShares }).catch((error) => setLoadError(error.message));
+    const log = createAuditLog('PERMISSION_CHANGE', 'Public Share Links', 'file', 'Updated public share links configuration');
+    const nextLogs = [log, ...auditLogs];
+    setAuditLogs(nextLogs);
+    persistState({ shares: nextShares, auditLogs: nextLogs }).catch((error) => setLoadError(error.message));
   };
 
   const addAuditLog = (
@@ -1355,6 +1361,73 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                         Create Repository
                       </button>
                     )}
+                  </div>
+                ) : viewMode === 'list' ? (
+                  <div className="overflow-x-auto rounded-lg border border-[#1e3059] bg-[#070c18]">
+                    <table className="w-full text-left text-xs font-sans border-collapse">
+                      <thead>
+                        <tr className="border-b border-[#1e3059] bg-[#090f21] text-slate-400 select-none">
+                          <th className="px-4 py-2.5 font-semibold text-slate-300">Name</th>
+                          <th className="px-4 py-2.5 font-semibold text-slate-300">Description</th>
+                          <th className="px-4 py-2.5 font-semibold text-slate-300">Folders</th>
+                          <th className="px-4 py-2.5 font-semibold text-slate-300">Files</th>
+                          <th className="px-4 py-2.5 font-semibold text-slate-300">Last Activity</th>
+                          {canManagePlatform && <th className="px-4 py-2.5 font-semibold text-slate-300 text-right">Actions</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#1e3059]/40 text-slate-200">
+                        {visibleRepositories.map((repository) => {
+                          const repositoryFilesForCard = files.filter((file) => (file.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
+                          const repositoryFoldersForCard = folders.filter((folder) => (folder.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
+                          const repositoryFileCount = repositoryFilesForCard.length;
+                          const repositoryFolderCount = repositoryFoldersForCard.length;
+                          const repositoryItemNames = new Set([
+                            ...repositoryFilesForCard.map((file) => file.name),
+                            ...repositoryFoldersForCard.map((folder) => folder.name),
+                          ]);
+                          const recentRepositoryLogs = auditLogs.filter((log) => repositoryItemNames.has(log.targetName)).slice(0, 2);
+                          const latestChange = recentRepositoryLogs[0]?.details || 'No recent changes';
+                          const isActive = repository.id === currentRepositoryId;
+
+                          return (
+                            <tr 
+                              key={repository.id}
+                              onClick={() => handleSelectRepository(repository.id)}
+                              className={`hover:bg-slate-800/20 cursor-pointer ${isActive ? 'bg-blue-950/15' : ''}`}
+                            >
+                              <td className="px-4 py-3 font-semibold text-white flex items-center space-x-2">
+                                <span className="truncate">{repository.name}</span>
+                                {isActive && (
+                                  <span className="rounded bg-blue-600 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-white">Active</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-slate-400 max-w-[200px] truncate">{repository.description}</td>
+                              <td className="px-4 py-3 font-mono text-[10px] text-slate-400">{repositoryFolderCount}</td>
+                              <td className="px-4 py-3 font-mono text-[10px] text-slate-400">{repositoryFileCount}</td>
+                              <td className="px-4 py-3 text-slate-300 max-w-[250px] truncate" title={latestChange}>{latestChange}</td>
+                              {canManagePlatform && (
+                                <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                                  <div className="inline-flex items-center space-x-1.5">
+                                    <button
+                                      onClick={() => handleRenameRepository(repository)}
+                                      className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1 text-[10px] font-semibold text-slate-200 hover:bg-slate-800"
+                                    >
+                                      Rename
+                                    </button>
+                                    <button
+                                      onClick={() => handleRequestDeleteRepository(repository)}
+                                      className="rounded border border-red-800 bg-red-950/70 px-2.5 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-900"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -1527,11 +1600,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
               <div className="flex items-center justify-between border-b pb-2.5 border-slate-800">
                 <div className="flex items-center space-x-2">
                   <Activity className="h-4.5 w-4.5 text-blue-400" />
-                  <span className="font-bold text-sm text-white">Event Log Feed</span>
-                </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider">Live</span>
+                  <span className="font-bold text-sm text-white">Audit Logs</span>
                 </div>
               </div>
 
