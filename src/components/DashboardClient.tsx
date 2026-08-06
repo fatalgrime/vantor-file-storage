@@ -1657,112 +1657,114 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
               </p>
             </div>
 
-            <div className="space-y-4 px-5 py-4">
-              {dialog.type === 'rename' && (
-                <label className="block text-xs font-semibold text-slate-300">
-                  Name
-                  <input
-                    autoFocus
-                    value={dialog.value}
-                    onChange={(event) => setDialog({ ...dialog, value: event.target.value })}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') handleSaveRename();
-                      if (event.key === 'Escape') setDialog(null);
-                    }}
-                    className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
-                  />
-                </label>
-              )}
-
-              {dialog.type === 'createRepository' && (
-                <>
+            {['rename', 'createRepository', 'renameRepository', 'deleteRepository', 'move'].includes(dialog.type) && (
+              <div className="space-y-4 px-5 py-4">
+                {dialog.type === 'rename' && (
                   <label className="block text-xs font-semibold text-slate-300">
-                    Repository name
+                    Name
                     <input
                       autoFocus
-                      value={dialog.name}
-                      onChange={(event) => setDialog({ ...dialog, name: event.target.value })}
+                      value={dialog.value}
+                      onChange={(event) => setDialog({ ...dialog, value: event.target.value })}
                       onKeyDown={(event) => {
-                        if (event.key === 'Enter') handleSaveRepository();
+                        if (event.key === 'Enter') handleSaveRename();
                         if (event.key === 'Escape') setDialog(null);
                       }}
                       className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
                     />
                   </label>
-                  <label className="block text-xs font-semibold text-slate-300">
-                    Description
-                    <textarea
-                      rows={3}
-                      value={dialog.description}
-                      onChange={(event) => setDialog({ ...dialog, description: event.target.value })}
-                      className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
-                    />
-                  </label>
-                </>
-              )}
+                )}
 
-              {dialog.type === 'renameRepository' && (
-                <>
+                {dialog.type === 'createRepository' && (
+                  <>
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Repository name
+                      <input
+                        autoFocus
+                        value={dialog.name}
+                        onChange={(event) => setDialog({ ...dialog, name: event.target.value })}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') handleSaveRepository();
+                          if (event.key === 'Escape') setDialog(null);
+                        }}
+                        className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
+                      />
+                    </label>
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Description
+                      <textarea
+                        rows={3}
+                        value={dialog.description}
+                        onChange={(event) => setDialog({ ...dialog, description: event.target.value })}
+                        className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
+                      />
+                    </label>
+                  </>
+                )}
+
+                {dialog.type === 'renameRepository' && (
+                  <>
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Repository name
+                      <input
+                        autoFocus
+                        value={dialog.name}
+                        onChange={(event) => setDialog({ ...dialog, name: event.target.value })}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') handleSaveRepositoryRename();
+                          if (event.key === 'Escape') setDialog(null);
+                        }}
+                        className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
+                      />
+                    </label>
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Description
+                      <textarea
+                        rows={3}
+                        value={dialog.description}
+                        onChange={(event) => setDialog({ ...dialog, description: event.target.value })}
+                        className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
+                      />
+                    </label>
+                  </>
+                )}
+
+                {dialog.type === 'deleteRepository' && (
                   <label className="block text-xs font-semibold text-slate-300">
-                    Repository name
+                    Confirm repository name
                     <input
                       autoFocus
-                      value={dialog.name}
-                      onChange={(event) => setDialog({ ...dialog, name: event.target.value })}
+                      value={dialog.confirmation}
+                      onChange={(event) => setDialog({ ...dialog, confirmation: event.target.value })}
                       onKeyDown={(event) => {
-                        if (event.key === 'Enter') handleSaveRepositoryRename();
+                        if (event.key === 'Enter') handleConfirmDeleteRepository();
                         if (event.key === 'Escape') setDialog(null);
                       }}
-                      className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
+                      className="mt-1 w-full rounded-lg border border-red-900 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-red-500"
                     />
                   </label>
+                )}
+
+                {dialog.type === 'move' && (
                   <label className="block text-xs font-semibold text-slate-300">
-                    Description
-                    <textarea
-                      rows={3}
-                      value={dialog.description}
-                      onChange={(event) => setDialog({ ...dialog, description: event.target.value })}
-                      className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
-                    />
+                    Destination Folder
+                    <select
+                      autoFocus
+                      value={dialog.destinationFolderId}
+                      onChange={(event) => setDialog({ ...dialog, destinationFolderId: event.target.value })}
+                      className="mt-1.5 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs text-white outline-none focus:border-blue-500"
+                    >
+                      <option value="root">/ (Repository Root)</option>
+                      {getMoveDestinations(dialog.item, dialog.isFolder).map((folder) => (
+                        <option key={folder.id} value={folder.id}>
+                          {getFolderPathString(folder, folders)}
+                        </option>
+                      ))}
+                    </select>
                   </label>
-                </>
-              )}
-
-              {dialog.type === 'deleteRepository' && (
-                <label className="block text-xs font-semibold text-slate-300">
-                  Confirm repository name
-                  <input
-                    autoFocus
-                    value={dialog.confirmation}
-                    onChange={(event) => setDialog({ ...dialog, confirmation: event.target.value })}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') handleConfirmDeleteRepository();
-                      if (event.key === 'Escape') setDialog(null);
-                    }}
-                    className="mt-1 w-full rounded-lg border border-red-900 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-red-500"
-                  />
-                </label>
-              )}
-
-              {dialog.type === 'move' && (
-                <label className="block text-xs font-semibold text-slate-300">
-                  Destination Folder
-                  <select
-                    autoFocus
-                    value={dialog.destinationFolderId}
-                    onChange={(event) => setDialog({ ...dialog, destinationFolderId: event.target.value })}
-                    className="mt-1.5 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs text-white outline-none focus:border-blue-500"
-                  >
-                    <option value="root">/ (Repository Root)</option>
-                    {getMoveDestinations(dialog.item, dialog.isFolder).map((folder) => (
-                      <option key={folder.id} value={folder.id}>
-                        {getFolderPathString(folder, folders)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-2 border-t border-slate-800 bg-[#060a17] px-5 py-3">
               {dialog.type !== 'notice' && (

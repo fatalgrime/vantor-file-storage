@@ -115,7 +115,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       uploadedByRole: 'admin',
     });
 
-    setSuccessMsg(`Successfully uploaded file "${fileName}"!`);
     setFileName('');
     setFileDescription('');
     setRawContent('');
@@ -172,7 +171,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       allowedRoles: ALL_USER_ROLES,
     });
 
-    setSuccessMsg(`Successfully created folder "${folderName}"!`);
     setFolderName('');
     setFolderDescription('');
   };
