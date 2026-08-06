@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { VantorFile, VantorFolder, PermissionLevel, UserRole, VantorUser, Collaborator, ShareLink } from '../lib/types';
 import { ALL_USER_ROLES } from '../lib/authorization';
+import { useToast } from './ToastProvider';
 
 interface AccessControlModalProps {
   item: VantorFile | VantorFolder | null;
@@ -67,6 +68,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
   const [expirationType, setExpirationType] = useState<'never' | '1h' | '1d' | '7d' | '30d' | 'custom'>('never');
   const [customExpirationDate, setCustomExpirationDate] = useState('');
   const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
+  const { addToast } = useToast();
 
   const handleToggleRole = (role: UserRole) => {
     if (selectedRoles.includes(role)) {
@@ -101,6 +103,11 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
 
   const handleSave = () => {
     onSavePermissions(item.id, permissionLevel, selectedRoles, isFolder, collaborators, propagateToChildren);
+    addToast({
+      type: 'success',
+      title: 'Permissions saved',
+      message: `Updated access permissions for "${item.name}".`,
+    });
     onClose();
   };
 
@@ -138,6 +145,11 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
     };
 
     onSaveShares([...shares, newLink]);
+    addToast({
+      type: 'success',
+      title: 'Share link generated',
+      message: `Created secure share link "${newLink.label}".`,
+    });
     
     // Reset Form
     setLinkLabel('');
@@ -150,6 +162,11 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
 
   const handleRevokeShareLink = (linkId: string) => {
     onSaveShares(shares.filter(s => s.id !== linkId));
+    addToast({
+      type: 'info',
+      title: 'Share link revoked',
+      message: 'The share link has been revoked and removed.',
+    });
   };
 
   const handleCopyShareLink = (linkId: string) => {
@@ -157,6 +174,11 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
     navigator.clipboard.writeText(url);
     setCopiedLinkId(linkId);
     setTimeout(() => setCopiedLinkId(null), 2000);
+    addToast({
+      type: 'success',
+      title: 'Share link copied',
+      message: 'Secure share link copied to clipboard.',
+    });
   };
 
   const inviteableUsers = users.filter(
@@ -167,7 +189,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-lg rounded-xl border border-[#1e3059] bg-[#070d1d] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-xl sm:max-w-2xl rounded-xl border border-[#1e3059] bg-[#070d1d] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between border-b border-[#1e3059] px-6 py-4 bg-[#090f22] flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-950 border border-amber-800 text-amber-400">
@@ -408,34 +430,39 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
           )}
 
           {activeTab === 'links' && (
-            <div className="space-y-5">
+            <div className="space-y-6">
               {/* Generate New Link Form */}
-              <form onSubmit={handleCreateShareLink} className="bg-slate-900/60 p-4 border border-slate-800/80 rounded-xl space-y-3">
-                <h4 className="font-bold text-white text-xs flex items-center space-x-1.5">
-                  <LinkIcon className="h-4 w-4 text-blue-400" />
-                  <span>Generate Secure Share Link</span>
-                </h4>
+              <form onSubmit={handleCreateShareLink} className="bg-[#090f22]/90 p-5 border border-slate-800 rounded-xl space-y-4 shadow-xl">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                  <h4 className="font-bold text-white text-sm flex items-center space-x-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-950/80 border border-blue-800/60 text-blue-400">
+                      <LinkIcon className="h-4 w-4" />
+                    </div>
+                    <span>Generate Secure Share Link</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-400 font-mono">Public / Protected URL</span>
+                </div>
                 
-                <div className="space-y-1">
-                  <label className="block text-[11px] text-slate-400">Link Name / Label</label>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-300">Link Name / Label *</label>
                   <input 
                     type="text"
                     required
-                    placeholder="e.g. Client Review, Public Access"
+                    placeholder="e.g. Client Review, External Partner Access"
                     value={linkLabel}
                     onChange={(e) => setLinkLabel(e.target.value)}
-                    className="w-full rounded-lg border border-slate-850 bg-slate-950 px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+                    className="w-full rounded-lg border border-slate-800 bg-[#060a17] px-3.5 py-2 text-xs text-white outline-none focus:border-blue-500 transition-colors"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Expiration selection */}
-                  <div className="space-y-1">
-                    <label className="block text-[11px] text-slate-400">Access Expiration</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-slate-300">Access Expiration</label>
                     <select
                       value={expirationType}
                       onChange={(e) => setExpirationType(e.target.value as any)}
-                      className="w-full rounded-lg border border-slate-850 bg-slate-950 px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+                      className="w-full rounded-lg border border-slate-800 bg-[#060a17] px-3.5 py-2 text-xs text-white outline-none focus:border-blue-500 transition-colors"
                     >
                       <option value="never">Never Expires</option>
                       <option value="1h">1 Hour</option>
@@ -446,134 +473,136 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                     </select>
                   </div>
 
-                  {/* Permissions Selection */}
-                  <div className="space-y-1">
-                    <label className="block text-[11px] text-slate-400">Recipient Permissions</label>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <label className="flex items-center space-x-1.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={allowDownload}
-                          onChange={(e) => setAllowDownload(e.target.checked)}
-                          className="h-3.5 w-3.5 rounded border-slate-800 bg-slate-950 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-[11px] text-slate-300">Allow Downloads</span>
-                      </label>
-                    </div>
+                  {/* Download Permissions Option */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-slate-300">File Download Permission</label>
+                    <label className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#060a17] px-3.5 py-2 cursor-pointer hover:border-slate-700 transition-colors">
+                      <span className="text-xs text-slate-300 font-medium">Allow File Downloads</span>
+                      <input
+                        type="checkbox"
+                        checked={allowDownload}
+                        onChange={(e) => setAllowDownload(e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </label>
                   </div>
                 </div>
 
                 {expirationType === 'custom' && (
-                  <div className="space-y-1">
-                    <label className="block text-[11px] text-slate-400">Custom Expiration Date/Time</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-slate-300">Custom Expiration Date & Time</label>
                     <input 
                       type="datetime-local"
                       required
                       value={customExpirationDate}
                       onChange={(e) => setCustomExpirationDate(e.target.value)}
-                      className="w-full rounded-lg border border-slate-850 bg-slate-950 px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+                      className="w-full rounded-lg border border-slate-800 bg-[#060a17] px-3.5 py-2 text-xs text-white outline-none focus:border-blue-500 transition-colors"
                     />
                   </div>
                 )}
 
                 {/* Password Protection */}
-                <div className="space-y-2 pt-1 border-t border-slate-850/60">
-                  <label className="flex items-center space-x-2 cursor-pointer">
+                <div className="space-y-3 pt-3 border-t border-slate-800/80">
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
                     <input 
                       type="checkbox"
                       checked={usePassword}
                       onChange={(e) => setUsePassword(e.target.checked)}
-                      className="h-3.5 w-3.5 rounded border-slate-800 bg-slate-950 text-blue-600 focus:ring-blue-500"
+                      className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
-                    <span className="font-semibold text-slate-300">Require Access Password</span>
+                    <span className="text-xs font-semibold text-slate-200">Enable Passcode Security</span>
                   </label>
                   {usePassword && (
                     <div className="relative">
-                      <Key className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-500" />
+                      <Key className="absolute left-3 top-2.5 h-3.5 w-3.5 text-amber-400" />
                       <input 
                         type="password"
                         required
-                        placeholder="Enter secure link password..."
+                        placeholder="Set required passcode to access link..."
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full rounded-lg border border-slate-850 bg-slate-950 pl-8 pr-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                        className="w-full rounded-lg border border-amber-900/60 bg-[#060a17] pl-9 pr-3.5 py-2 text-xs text-white outline-none focus:border-amber-500 transition-colors"
                       />
                     </div>
                   )}
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full flex items-center justify-center space-x-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 py-2 text-xs font-semibold text-white transition-all shadow-glow-blue"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Generate Link</span>
-                </button>
+                <div className="pt-1">
+                  <button
+                    type="submit"
+                    className="w-full flex items-center justify-center space-x-2 rounded-lg bg-blue-600 hover:bg-blue-500 py-2.5 text-xs font-bold text-white transition-all shadow-lg shadow-blue-500/25"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Generate Share Link</span>
+                  </button>
+                </div>
               </form>
 
               {/* Active Links List */}
-              <div className="space-y-2">
-                <label className="block text-xs font-semibold text-slate-300">Active Generated Links ({activeShares.length})</label>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wide">Active Generated Links ({activeShares.length})</h4>
+                </div>
                 {activeShares.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-slate-800 p-6 text-center text-slate-500">
-                    No public share links generated yet.
+                  <div className="rounded-xl border border-dashed border-slate-800 bg-[#090f22]/40 p-6 text-center text-xs text-slate-400">
+                    No public share links generated yet for this item.
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
                     {activeShares.map((link) => {
                       const isExpired = link.expiresAt && new Date(link.expiresAt).getTime() < Date.now();
                       return (
-                        <div key={link.id} className="p-3 bg-slate-900/40 border border-slate-800 rounded-lg flex flex-col space-y-2">
+                        <div key={link.id} className="p-3.5 bg-[#090f22]/80 border border-slate-800 rounded-xl flex flex-col space-y-2.5 shadow-md">
                           <div className="flex items-center justify-between">
                             <div>
                               <span className="font-bold text-white text-xs">{link.label}</span>
-                              <div className="flex items-center space-x-2 mt-0.5 text-[10px] text-slate-400">
-                                <span className="flex items-center"><Eye className="h-3 w-3 mr-0.5 text-blue-400" /> {link.viewsCount} views</span>
+                              <div className="flex items-center space-x-3 mt-1 text-[11px] text-slate-400">
+                                <span className="flex items-center"><Eye className="h-3 w-3 mr-1 text-blue-400" /> {link.viewsCount} views</span>
                                 {link.allowDownload && (
-                                  <span className="flex items-center"><Download className="h-3 w-3 mr-0.5 text-emerald-400" /> {link.downloadsCount} dl</span>
+                                  <span className="flex items-center"><Download className="h-3 w-3 mr-1 text-emerald-400" /> {link.downloadsCount} downloads</span>
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center space-x-1">
+                            <div className="flex items-center space-x-1.5">
                               <button
                                 onClick={() => handleCopyShareLink(link.id)}
-                                className="p-1.5 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition-colors"
-                                title="Copy Link"
+                                className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-300 hover:text-white transition-colors border border-slate-800"
+                                title="Copy Share Link"
                               >
                                 {copiedLinkId === link.id ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
                               </button>
                               <button
                                 onClick={() => handleRevokeShareLink(link.id)}
-                                className="p-1.5 hover:bg-red-950/60 rounded text-slate-400 hover:text-red-400 transition-colors"
-                                title="Revoke Link"
+                                className="p-1.5 hover:bg-red-950/80 rounded-lg text-slate-400 hover:text-red-400 transition-colors border border-slate-800"
+                                title="Revoke & Delete Link"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                          <div className="flex flex-wrap items-center gap-2 text-[10px]">
                             {link.password && (
-                              <span className="px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-800/80 text-amber-300 flex items-center">
-                                <Key className="h-2.5 w-2.5 mr-0.5" /> Password
+                              <span className="px-2 py-0.5 rounded-md bg-amber-950/80 border border-amber-800/80 text-amber-300 font-medium flex items-center">
+                                <Key className="h-2.5 w-2.5 mr-1" /> Password Protected
                               </span>
                             )}
-                            <span className={`px-1.5 py-0.5 rounded ${
+                            <span className={`px-2 py-0.5 rounded-md font-medium ${
                               link.allowDownload 
                                 ? 'bg-emerald-950/80 border border-emerald-800 text-emerald-300' 
                                 : 'bg-slate-900 border border-slate-800 text-slate-400'
                             }`}>
                               {link.allowDownload ? 'Read & Download' : 'View Only'}
                             </span>
-                            <span className={`px-1.5 py-0.5 rounded flex items-center ${
+                            <span className={`px-2 py-0.5 rounded-md font-medium flex items-center ${
                               isExpired 
                                 ? 'bg-red-950 border border-red-850 text-red-300' 
-                                : link.expiresAt 
-                                  ? 'bg-blue-950/80 border border-blue-900 text-blue-300' 
-                                  : 'bg-slate-900 border border-slate-800 text-slate-400'
+                                : 'bg-slate-900 border border-slate-800 text-slate-400'
                             }`}>
-                              <Calendar className="h-2.5 w-2.5 mr-0.5" />
-                              {isExpired ? 'Expired' : link.expiresAt ? `Expires: ${new Date(link.expiresAt).toLocaleDateString()}` : 'Never Expires'}
+                              <Calendar className="h-2.5 w-2.5 mr-1" />
+                              {link.expiresAt 
+                                ? (isExpired ? 'Expired' : `Expires: ${new Date(link.expiresAt).toLocaleDateString()}`)
+                                : 'Never Expires'}
                             </span>
                           </div>
                         </div>
