@@ -866,6 +866,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     setCurrentRepositoryId(nextRepositoryId);
     setCurrentFolderId(null);
     setSelectedIds([]);
+    const deletedRepoName = dialog.repository.name;
     setDialog(null);
     if (!showRepositoryIndex) {
       router.push('/dashboard');
@@ -876,6 +877,11 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
       folders: nextFolders,
       auditLogs: nextLogs,
     }).catch((error) => setLoadError(error.message));
+    addToast({
+      type: 'success',
+      title: 'Repository deleted',
+      message: `"${deletedRepoName}" repository and its contents were deleted.`,
+    });
   };
 
   const handleUpdateManagedUser = (userId: string, updates: Partial<VantorUser>) => {
