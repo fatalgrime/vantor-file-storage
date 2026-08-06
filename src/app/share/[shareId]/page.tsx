@@ -36,11 +36,13 @@ import {
 } from 'lucide-react';
 import { VantorFile, VantorFolder, ShareLink } from '../../../lib/types';
 import { PdfViewer } from '../../../components/PdfViewer';
+import { useToast } from '../../../components/ToastProvider';
 
 export default function PublicSharePage() {
   const params = useParams();
   const shareId = params?.shareId as string;
   const router = useRouter();
+  const { addToast } = useToast();
 
   // Loading / Error states
   const [loading, setLoading] = useState(true);
@@ -95,7 +97,6 @@ export default function PublicSharePage() {
   const fetchShareData = async (enteredPassword?: string, subfolderId?: string) => {
     try {
       setLoading(true);
-      setErrorMsg('');
 
       let url = `/api/public/share/${shareId}`;
       const queryParams: string[] = [];
@@ -104,19 +105,20 @@ export default function PublicSharePage() {
       if (queryParams.length > 0) url += `?${queryParams.join('&')}`;
 
       const res = await fetch(url);
-      if (!res.ok) {
-        const payload = await res.json().catch(() => null);
-        throw new Error(payload?.error || 'Failed to retrieve share contents.');
-      }
-
       const data = await res.json().catch(() => null);
 
       if (data?.passwordRequired) {
         setPasswordRequired(true);
         setLinkLabel(data.label || 'Secure Link');
         setItemType(data.itemType);
-        if (enteredPassword || data?.error || !res.ok) {
-          setAuthError(data?.error || 'Incorrect password. Please try again.');
+        if (enteredPassword || !res.ok || data?.error) {
+          const msg = data?.error || 'Incorrect password. Please try again.';
+          setAuthError(msg);
+          addToast({
+            type: 'error',
+            title: 'Invalid Password',
+            message: msg,
+          });
         } else {
           setAuthError('');
         }
@@ -124,6 +126,11 @@ export default function PublicSharePage() {
         return;
       }
 
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to retrieve share contents.');
+      }
+
+      setErrorMsg('');
       setPasswordRequired(false);
       setAllowDownload(data.allowDownload);
       setItemType(data.itemType);
@@ -210,7 +217,13 @@ export default function PublicSharePage() {
     e.preventDefault();
     setAuthError('');
     if (!password.trim()) {
-      setAuthError('Please enter a password to decrypt this file.');
+      const msg = 'Please enter a password to decrypt this file.';
+      setAuthError(msg);
+      addToast({
+        type: 'warning',
+        title: 'Password Required',
+        message: msg,
+      });
       return;
     }
 
@@ -825,11 +838,10 @@ export default function PublicSharePage() {
                   setPassword(e.target.value);
                   if (authError) setAuthError('');
                 }}
-                className={`w-full rounded-lg border bg-slate-900 pl-10 pr-3 py-2 text-xs text-white outline-none transition-colors ${
-                  authError 
-                    ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500' 
+                className={`w-full rounded-lg border bg-slate-900 pl-10 pr-3 py-2 text-xs text-white outline-none transition-colors ${authError
+                    ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500'
                     : 'border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
-                }`}
+                  }`}
               />
             </div>
             {authError && (

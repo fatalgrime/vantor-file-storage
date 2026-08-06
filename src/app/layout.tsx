@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
+import { ToastProvider } from '../components/ToastProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -58,7 +59,9 @@ export default function RootLayout({
           />
         </head>
         <body className="min-h-screen bg-[#060a17] text-slate-100 antialiased selection:bg-blue-600 selection:text-white">
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </body>
       </html>
     </ClerkProvider>
