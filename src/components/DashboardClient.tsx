@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Navbar } from './Navbar';
 import { formatBytes } from '../lib/dateUtils';
 import { AnimatePresence, motion } from 'framer-motion';
-import { HelpCircle, X, Mail } from 'lucide-react';
+import { HelpCircle, X, Mail, Activity, Upload, Trash2, Key, Folder } from 'lucide-react';
 import { HeroChangelog } from './HeroChangelog';
 import { FileBrowser } from './FileBrowser';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -123,6 +123,12 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   const [managedUsers, setManagedUsers] = useState<VantorUser[]>([]);
   const [shares, setShares] = useState<ShareLink[]>([]);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [loggerFilter, setLoggerFilter] = useState<'ALL' | 'UPLOAD' | 'DELETE' | 'PERMISSION_CHANGE'>('ALL');
+
+  const filteredLogs = useMemo(() => {
+    if (loggerFilter === 'ALL') return auditLogs;
+    return auditLogs.filter(log => log.action === loggerFilter);
+  }, [auditLogs, loggerFilter]);
 
   const displayName = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Vantor User';
 
@@ -1231,6 +1237,21 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     return newLog;
   };
 
+  const getLogIcon = (action: AuditLog['action']) => {
+    switch (action) {
+      case 'UPLOAD':
+        return <Upload className="h-3 w-3 text-emerald-400" />;
+      case 'DELETE':
+        return <Trash2 className="h-3 w-3 text-rose-400" />;
+      case 'PERMISSION_CHANGE':
+        return <Key className="h-3 w-3 text-amber-400" />;
+      case 'FOLDER_CREATE':
+        return <Folder className="h-3 w-3 text-blue-400" />;
+      default:
+        return <Activity className="h-3 w-3 text-slate-400" />;
+    }
+  };
+
   if (!isMounted || !isLoaded) {
     return (
       <div className="min-h-screen bg-[#060a17] text-slate-100 flex items-center justify-center font-sans">
@@ -1285,6 +1306,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         canManagePlatform={canManagePlatform}
         canUseRoleSwitcher={canUseRoleSwitcher}
         onOpenHelp={() => setIsHelpOpen(true)}
+        onReloadContent={() => window.location.reload()}
       />
 
       {/* Main Content Body */}
@@ -1296,204 +1318,299 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
           </div>
         )}
 
-        {showRepositoryIndex && (
-          <section className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h1 className="text-lg font-bold text-white">Repositories</h1>
-                <p className="text-xs text-slate-400">Browse repository workspaces and create new storage areas.</p>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+          {/* Left Column: Repository Cards or File browser */}
+          <div className="lg:col-span-3 space-y-6">
+            {showRepositoryIndex && (
+              <section className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h1 className="text-lg font-bold text-white">Repositories</h1>
+                    <p className="text-xs text-slate-400">Browse repository workspaces and create new storage areas.</p>
+                  </div>
+                  {canManagePlatform && (
+                    <button
+                      onClick={handleCreateRepository}
+                      className="rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-500"
+                    >
+                      New Repository
+                    </button>
+                  )}
+                </div>
+                {isLoading ? (
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <div className="h-32 rounded-lg border border-slate-800 bg-slate-900/40 animate-pulse" />
+                    <div className="h-32 rounded-lg border border-slate-800 bg-slate-900/40 animate-pulse" />
+                    <div className="h-32 rounded-lg border border-slate-800 bg-slate-900/40 animate-pulse" />
+                  </div>
+                ) : visibleRepositories.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-800 bg-slate-950/40 p-8 text-center">
+                    <p className="text-sm font-semibold text-slate-300">No repositories found in database</p>
+                    <p className="mt-1 text-xs text-slate-500">Create your first repository workspace to get started.</p>
+                    {canManagePlatform && (
+                      <button
+                        onClick={handleCreateRepository}
+                        className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500"
+                      >
+                        Create Repository
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    {visibleRepositories.map((repository) => {
+                      const repositoryFilesForCard = files.filter((file) => (file.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
+                      const repositoryFoldersForCard = folders.filter((folder) => (folder.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
+                      const repositoryFileCount = repositoryFilesForCard.length;
+                      const repositoryFolderCount = repositoryFoldersForCard.length;
+                      const repositoryItemNames = new Set([
+                        ...repositoryFilesForCard.map((file) => file.name),
+                        ...repositoryFoldersForCard.map((folder) => folder.name),
+                      ]);
+                      const recentRepositoryLogs = auditLogs.filter((log) => repositoryItemNames.has(log.targetName)).slice(0, 2);
+                      const latestChange = recentRepositoryLogs[0]?.details || 'No recent changes';
+                      const isActive = repository.id === currentRepositoryId;
+
+                      return (
+                        <button
+                          key={repository.id}
+                          onClick={() => handleSelectRepository(repository.id)}
+                          className={`rounded-lg border p-4 text-left transition-colors ${isActive
+                            ? 'border-blue-500 bg-blue-950/30'
+                            : 'border-[#1e3059] bg-[#070c18] hover:border-blue-700/80'
+                            }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h2 className="truncate text-sm font-bold text-white">{repository.name}</h2>
+                              <p className="mt-1 text-xs text-slate-400">{repository.description}</p>
+                            </div>
+                            {isActive && (
+                              <span className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">Active</span>
+                            )}
+                          </div>
+                          <div className="mt-4 flex items-center gap-3 text-[11px] font-mono text-slate-400">
+                            <span>{repositoryFolderCount} folders</span>
+                            <span>{repositoryFileCount} files</span>
+                            <span>Updated {repository.updatedAt}</span>
+                          </div>
+                          <div className="mt-3 rounded border border-slate-800 bg-slate-950/50 px-3 py-2 text-[11px] text-slate-300">
+                            <span className="font-semibold text-slate-200">Activity:</span> {latestChange}
+                          </div>
+                          {canManagePlatform && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleRenameRepository(repository);
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.stopPropagation();
+                                    handleRenameRepository(repository);
+                                  }
+                                }}
+                                className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:bg-slate-800"
+                              >
+                                Rename
+                              </span>
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleRequestDeleteRepository(repository);
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.stopPropagation();
+                                    handleRequestDeleteRepository(repository);
+                                  }
+                                }}
+                                className="rounded border border-red-800 bg-red-950/70 px-2.5 py-1 text-[11px] font-semibold text-red-200 hover:bg-red-900"
+                              >
+                                Delete
+                              </span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {!showRepositoryIndex && (
+              isLoading ? (
+                <section className="rounded-lg border border-slate-800 bg-slate-900/40 p-4 animate-pulse">
+                  <div className="h-4 w-32 bg-slate-700 rounded mb-3"></div>
+                  <div className="h-8 w-64 bg-slate-700 rounded mb-3"></div>
+                  <div className="h-4 w-96 bg-slate-700 rounded"></div>
+                </section>
+              ) : currentRepository ? (
+                <section className="rounded-lg border border-[#1e3059] bg-[#070c18] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase text-blue-300">Repository</p>
+                      <h1 className="mt-1 truncate text-xl font-bold text-white">{currentRepository.name}</h1>
+                      <p className="mt-1 text-xs text-slate-400">{currentRepository.description}</p>
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] font-mono text-slate-400">
+                        <span>Created by {currentRepository.createdBy}</span>
+                        <span>Updated {currentRepository.updatedAt}</span>
+                      </div>
+                    </div>
+                    {canManagePlatform && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleRenameRepository(currentRepository)}
+                          className="rounded border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                        >
+                          Settings
+                        </button>
+                        <button
+                          onClick={() => handleRequestDeleteRepository(currentRepository)}
+                          className="rounded border border-red-800 bg-red-950/70 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-900"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              ) : (
+                <div className="rounded-lg border border-red-800 bg-red-950/30 p-4 text-red-400">
+                  Repository not found.
+                </div>
+              )
+            )}
+
+            {!showRepositoryIndex && (
+              <Breadcrumbs
+                items={currentFolderPath}
+                onNavigateFolder={(id) => setCurrentFolderId(id)}
+                isDark={isDark}
+              />
+            )}
+
+            {!showRepositoryIndex && (
+              <div className="space-y-3">
+                <FileBrowser
+                  folders={displayedFolders}
+                  files={displayedFiles}
+                  selectedIds={selectedIds}
+                  onToggleSelect={handleToggleSelect}
+                  onToggleSelectAll={handleToggleSelectAll}
+                  onOpenFolder={(id) => setCurrentFolderId(id)}
+                  onPreviewFile={(file) => setPreviewFile(file)}
+                  onDownloadFile={handleDownloadFile}
+                  onCopyLink={handleCopyLink}
+                  onEditItem={handleRenameItem}
+                  onManagePermissions={(item, isFolder) => setPermissionTarget({ item, isFolder })}
+                  onDeleteItem={handleDeleteItem}
+                  onMoveItem={handleMoveItem}
+                  viewMode={viewMode}
+                  currentRole={effectiveRole}
+                  canEdit={(item) => canEditItem(effectiveRole, currentUserId, item, folders, currentRepository)}
+                  canDelete={canDeleteContent}
+                  canManagePermissions={(item) => canEditItem(effectiveRole, currentUserId, item, folders, currentRepository) || canManagePlatform}
+                />
               </div>
-              {canManagePlatform && (
+            )}
+          </div>
+
+          {/* Right Column: Real-time Event Logger Feed */}
+          <div className="lg:col-span-1 space-y-4">
+            <div className={`rounded-xl border p-4 backdrop-blur-md shadow-2xl space-y-4 flex flex-col max-h-[600px] ${isDark ? 'border-[#1e3059] bg-[#070c18]/90' : 'border-gray-200 bg-white'}`}>
+              <div className="flex items-center justify-between border-b pb-2.5 border-slate-800">
+                <div className="flex items-center space-x-2">
+                  <Activity className="h-4.5 w-4.5 text-blue-400" />
+                  <span className="font-bold text-sm text-white">Event Log Feed</span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider">Live</span>
+                </div>
+              </div>
+
+              {/* Filter pills */}
+              <div className="flex flex-wrap gap-1 text-[10px]">
                 <button
-                  onClick={handleCreateRepository}
-                  className="rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-500"
+                  onClick={() => setLoggerFilter('ALL')}
+                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${loggerFilter === 'ALL' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
                 >
-                  New Repository
+                  All
+                </button>
+                <button
+                  onClick={() => setLoggerFilter('UPLOAD')}
+                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${loggerFilter === 'UPLOAD' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                >
+                  Uploads
+                </button>
+                <button
+                  onClick={() => setLoggerFilter('PERMISSION_CHANGE')}
+                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${loggerFilter === 'PERMISSION_CHANGE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                >
+                  Security
+                </button>
+                <button
+                  onClick={() => setLoggerFilter('DELETE')}
+                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${loggerFilter === 'DELETE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                >
+                  Deletes
+                </button>
+              </div>
+
+              {/* Scrollable list */}
+              <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 max-h-[420px] min-h-[150px]">
+                {filteredLogs.length === 0 ? (
+                  <div className="text-center py-10 text-xs text-slate-500">
+                    No events found in this category.
+                  </div>
+                ) : (
+                  filteredLogs.map((log) => (
+                    <div key={log.id} className="p-2.5 rounded bg-slate-950/40 border border-slate-900 text-xs space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-1.5">
+                          {getLogIcon(log.action)}
+                          <span className="font-mono text-[9px] text-slate-500">
+                            {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </span>
+                        </div>
+                        <span className="rounded bg-slate-900 px-1.5 py-0.5 text-[8px] font-semibold text-slate-400 uppercase tracking-wider">
+                          {log.role}
+                        </span>
+                      </div>
+                      <p className="text-slate-300 leading-normal text-[11px]">
+                        <span className="font-semibold text-white">{log.performedBy}</span> {log.action === 'UPLOAD' ? 'uploaded' : log.action === 'DELETE' ? 'deleted' : log.action === 'FOLDER_CREATE' ? 'created folder' : log.action === 'PERMISSION_CHANGE' ? 'updated permissions for' : 'changed'} <span className="text-blue-400 font-medium font-mono">{log.targetName}</span>
+                      </p>
+                      {log.details && (
+                        <p className="text-[10px] text-slate-500 italic font-sans truncate">
+                          {log.details}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Clear logs button for admins */}
+              {canManagePlatform && auditLogs.length > 0 && (
+                <button
+                  onClick={() => {
+                    setAuditLogs([]);
+                    persistState({ auditLogs: [] }).catch((error) => setLoadError(error.message));
+                  }}
+                  className="w-full text-center py-1.5 rounded bg-red-950/10 hover:bg-red-950/30 border border-red-900/30 text-[10px] font-semibold text-red-400 transition-colors cursor-pointer"
+                >
+                  Clear Log Feed
                 </button>
               )}
             </div>
-            {isLoading ? (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className="h-32 rounded-lg border border-slate-800 bg-slate-900/40 animate-pulse" />
-                <div className="h-32 rounded-lg border border-slate-800 bg-slate-900/40 animate-pulse" />
-                <div className="h-32 rounded-lg border border-slate-800 bg-slate-900/40 animate-pulse" />
-              </div>
-            ) : visibleRepositories.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-800 bg-slate-950/40 p-8 text-center">
-                <p className="text-sm font-semibold text-slate-300">No repositories found in database</p>
-                <p className="mt-1 text-xs text-slate-500">Create your first repository workspace to get started.</p>
-                {canManagePlatform && (
-                  <button
-                    onClick={handleCreateRepository}
-                    className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500"
-                  >
-                    Create Repository
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                {visibleRepositories.map((repository) => {
-                  const repositoryFilesForCard = files.filter((file) => (file.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
-                  const repositoryFoldersForCard = folders.filter((folder) => (folder.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
-                  const repositoryFileCount = repositoryFilesForCard.length;
-                  const repositoryFolderCount = repositoryFoldersForCard.length;
-                  const repositoryItemNames = new Set([
-                    ...repositoryFilesForCard.map((file) => file.name),
-                    ...repositoryFoldersForCard.map((folder) => folder.name),
-                  ]);
-                  const recentRepositoryLogs = auditLogs.filter((log) => repositoryItemNames.has(log.targetName)).slice(0, 2);
-                  const latestChange = recentRepositoryLogs[0]?.details || 'No recent changes';
-                  const isActive = repository.id === currentRepositoryId;
-
-                  return (
-                    <button
-                      key={repository.id}
-                      onClick={() => handleSelectRepository(repository.id)}
-                      className={`rounded-lg border p-4 text-left transition-colors ${isActive
-                        ? 'border-blue-500 bg-blue-950/30'
-                        : 'border-[#1e3059] bg-[#070c18] hover:border-blue-700/80'
-                        }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h2 className="truncate text-sm font-bold text-white">{repository.name}</h2>
-                          <p className="mt-1 text-xs text-slate-400">{repository.description}</p>
-                        </div>
-                        {isActive && (
-                          <span className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">Active</span>
-                        )}
-                      </div>
-                      <div className="mt-4 flex items-center gap-3 text-[11px] font-mono text-slate-400">
-                        <span>{repositoryFolderCount} folders</span>
-                        <span>{repositoryFileCount} files</span>
-                        <span>Updated {repository.updatedAt}</span>
-                      </div>
-                      <div className="mt-3 rounded border border-slate-800 bg-slate-950/50 px-3 py-2 text-[11px] text-slate-300">
-                        <span className="font-semibold text-slate-200">Activity:</span> {latestChange}
-                      </div>
-                      {canManagePlatform && (
-                        <div className="mt-3 flex items-center gap-2">
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleRenameRepository(repository);
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') {
-                                event.stopPropagation();
-                                handleRenameRepository(repository);
-                              }
-                            }}
-                            className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:bg-slate-800"
-                          >
-                            Rename
-                          </span>
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleRequestDeleteRepository(repository);
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') {
-                                event.stopPropagation();
-                                handleRequestDeleteRepository(repository);
-                              }
-                            }}
-                            className="rounded border border-red-800 bg-red-950/70 px-2.5 py-1 text-[11px] font-semibold text-red-200 hover:bg-red-900"
-                          >
-                            Delete
-                          </span>
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        )}
-
-        {!showRepositoryIndex && (
-          isLoading ? (
-            <section className="rounded-lg border border-slate-800 bg-slate-900/40 p-4 animate-pulse">
-              <div className="h-4 w-32 bg-slate-700 rounded mb-3"></div>
-              <div className="h-8 w-64 bg-slate-700 rounded mb-3"></div>
-              <div className="h-4 w-96 bg-slate-700 rounded"></div>
-            </section>
-          ) : currentRepository ? (
-            <section className="rounded-lg border border-[#1e3059] bg-[#070c18] p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase text-blue-300">Repository</p>
-                  <h1 className="mt-1 truncate text-xl font-bold text-white">{currentRepository.name}</h1>
-                  <p className="mt-1 text-xs text-slate-400">{currentRepository.description}</p>
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] font-mono text-slate-400">
-                    <span>Created by {currentRepository.createdBy}</span>
-                    <span>Updated {currentRepository.updatedAt}</span>
-                  </div>
-                </div>
-                {canManagePlatform && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleRenameRepository(currentRepository)}
-                      className="rounded border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800"
-                    >
-                      Settings
-                    </button>
-                    <button
-                      onClick={() => handleRequestDeleteRepository(currentRepository)}
-                      className="rounded border border-red-800 bg-red-950/70 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-900"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            </section>
-          ) : (
-            <div className="rounded-lg border border-red-800 bg-red-950/30 p-4 text-red-400">
-              Repository not found.
-            </div>
-          )
-        )}
-
-        {!showRepositoryIndex && (
-          <Breadcrumbs
-            items={currentFolderPath}
-            onNavigateFolder={(id) => setCurrentFolderId(id)}
-            isDark={isDark}
-          />
-        )}
-
-        {!showRepositoryIndex && (
-          <div className="space-y-3">
-            <FileBrowser
-              folders={displayedFolders}
-              files={displayedFiles}
-              selectedIds={selectedIds}
-              onToggleSelect={handleToggleSelect}
-              onToggleSelectAll={handleToggleSelectAll}
-              onOpenFolder={(id) => setCurrentFolderId(id)}
-              onPreviewFile={(file) => setPreviewFile(file)}
-              onDownloadFile={handleDownloadFile}
-              onCopyLink={handleCopyLink}
-              onEditItem={handleRenameItem}
-              onManagePermissions={(item, isFolder) => setPermissionTarget({ item, isFolder })}
-              onDeleteItem={handleDeleteItem}
-              onMoveItem={handleMoveItem}
-              viewMode={viewMode}
-              currentRole={effectiveRole}
-              canEdit={(item) => canEditItem(effectiveRole, currentUserId, item, folders, currentRepository)}
-              canDelete={canDeleteContent}
-              canManagePermissions={(item) => canEditItem(effectiveRole, currentUserId, item, folders, currentRepository) || canManagePlatform}
-            />
           </div>
-        )}
+        </div>
       </main>
 
       {/* Footer Summary Bar */}

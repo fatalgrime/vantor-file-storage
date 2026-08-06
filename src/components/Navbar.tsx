@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   Search,
@@ -14,7 +14,8 @@ import {
   UserCheck,
   Sparkles,
   Trash2,
-  HelpCircle
+  HelpCircle,
+  RefreshCw
 } from 'lucide-react';
 import { UserButton, useUser, SignInButton } from '@clerk/nextjs';
 import { UserRole } from '../lib/types';
@@ -41,6 +42,7 @@ interface NavbarProps {
   canManagePlatform: boolean;
   canUseRoleSwitcher: boolean;
   onOpenHelp: () => void;
+  onReloadContent?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -65,8 +67,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   canManagePlatform,
   canUseRoleSwitcher,
   onOpenHelp,
+  onReloadContent,
 }) => {
   const { isSignedIn } = useUser();
+  const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
   if (!isSignedIn) return null;
 
   const isDark = true;
@@ -245,11 +249,37 @@ export const Navbar: React.FC<NavbarProps> = ({
         }`}>
         {/* Left: Public Share & Filters */}
         <div className="flex items-center space-x-3">
-          <div className={`flex items-center space-x-1 text-xs font-medium border px-2.5 py-1 rounded-md ${isDark ? 'text-slate-300 bg-slate-900/90 border-slate-800' : 'text-gray-600 bg-white border-gray-200'
-            }`}>
-            <Lock className="h-3 w-3 text-blue-400" />
-            <span>Public share</span>
-            <span className={`ml-1 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>▼</span>
+          <div className="relative">
+            <button
+              onClick={() => setIsShareDropdownOpen(!isShareDropdownOpen)}
+              className={`flex items-center space-x-1 text-xs font-medium border px-2.5 py-1 rounded-md transition-colors ${isDark ? 'text-slate-300 bg-slate-900/90 border-slate-800 hover:border-slate-700' : 'text-gray-600 bg-white border-gray-200 hover:border-gray-300'}`}
+            >
+              <Lock className="h-3 w-3 text-blue-400" />
+              <span>Public share</span>
+              <span className={`ml-1 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>▼</span>
+            </button>
+
+            {isShareDropdownOpen && (
+              <div
+                className={`absolute left-0 mt-1.5 z-[100] w-44 rounded-md border py-1 text-left text-xs shadow-2xl ${isDark ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-gray-700'}`}
+                onMouseLeave={() => setIsShareDropdownOpen(false)}
+              >
+                <button
+                  onClick={() => {
+                    setIsShareDropdownOpen(false);
+                    if (onReloadContent) {
+                      onReloadContent();
+                    } else {
+                      window.location.reload();
+                    }
+                  }}
+                  className={`w-full px-3 py-1.5 flex items-center space-x-2 transition-colors ${isDark ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-gray-100 text-gray-700'}`}
+                >
+                  <RefreshCw className="h-3.5 w-3.5 text-blue-400" />
+                  <span>Reload Content</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Type Filter */}
