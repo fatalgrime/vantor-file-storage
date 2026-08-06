@@ -649,7 +649,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
 
   // CRUD Operations
   const handleUploadFile = (newFileData: Partial<VantorFile>) => {
-    const destFolderId = newFileData.folderId ?? currentFolderId;
+    const destFolderId = newFileData.folderId !== undefined ? newFileData.folderId : currentFolderId;
     const destFolder = destFolderId ? folders.find((f) => f.id === destFolderId) : undefined;
     const hasWriteAccess = destFolder
       ? canEditItem(effectiveRole, currentUserId, destFolder, folders, currentRepository)
@@ -669,7 +669,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
       mimeType: newFileData.mimeType || 'text/plain',
       size: newFileData.size || 1024,
       formattedSize: newFileData.formattedSize || '1.0 KB',
-      folderId: newFileData.folderId ?? currentFolderId,
+      folderId: destFolderId,
       description: newFileData.description || 'Uploaded asset',
       tags: newFileData.tags || ['upload'],
       content: newFileData.content,
@@ -695,7 +695,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   };
 
   const handleCreateFolder = (newFolderData: Partial<VantorFolder>) => {
-    const destFolderId = newFolderData.parentId ?? currentFolderId;
+    const destFolderId = newFolderData.parentId !== undefined ? newFolderData.parentId : currentFolderId;
     const destFolder = destFolderId ? folders.find((f) => f.id === destFolderId) : undefined;
     const hasWriteAccess = destFolder
       ? canEditItem(effectiveRole, currentUserId, destFolder, folders, currentRepository)
@@ -708,7 +708,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     const newFolder: VantorFolder = {
       id: `folder-${Date.now()}`,
       name: newFolderData.name || 'New Folder',
-      parentId: newFolderData.parentId ?? currentFolderId,
+      parentId: destFolderId,
       description: newFolderData.description || 'Directory folder',
       permissionLevel: newFolderData.permissionLevel || 'public',
       allowedRoles: newFolderData.allowedRoles || ALL_USER_ROLES,

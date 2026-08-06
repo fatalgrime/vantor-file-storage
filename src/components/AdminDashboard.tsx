@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Upload,
@@ -63,6 +63,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<'upload' | 'folder' | 'files' | 'logs' | 'users'>(activeTabDefault);
   const [adminLogFilter, setAdminLogFilter] = useState<'ALL' | 'PERMISSION_CHANGE' | 'UPLOAD' | 'DELETE'>('ALL');
   const { addToast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(activeTabDefault);
+    }
+  }, [activeTabDefault, isOpen]);
 
   // Form states for New File Upload
   const [fileName, setFileName] = useState('');
@@ -120,6 +127,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setRawContent('');
     setFileSize(0);
     setFileMime('application/octet-stream');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -372,6 +382,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <label className="block text-slate-300 font-semibold mb-1">Select File (Max 2MB)</label>
                 <div className="relative w-full bg-[#040813] border border-slate-800 rounded-lg p-2 flex items-center justify-center">
                   <input
+                    ref={fileInputRef}
                     type="file"
                     onChange={handleFileSelect}
                     className="w-full text-xs text-slate-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-900/40 file:text-blue-300 hover:file:bg-blue-800/60 transition-colors"

@@ -1,21 +1,21 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  X, 
-  Download, 
-  Copy, 
-  Check, 
-  FileText, 
-  Lock, 
-  Globe, 
-  Users, 
-  ShieldAlert, 
-  Calendar, 
-  User, 
-  HardDrive, 
-  Tag, 
-  Eye, 
+import {
+  X,
+  Download,
+  Copy,
+  Check,
+  FileText,
+  Lock,
+  Globe,
+  Users,
+  ShieldAlert,
+  Calendar,
+  User,
+  HardDrive,
+  Tag,
+  Eye,
   Code,
   ZoomIn,
   ZoomOut,
@@ -58,7 +58,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'preview' | 'details' | 'security'>('preview');
-  
+
   // Image Viewer States
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -82,7 +82,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 
   useEffect(() => {
     if (!file) return;
-    
+
     // Reset states on file change
     setZoom(1);
     setRotation(0);
@@ -95,7 +95,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 
     const isAudio = file.mimeType.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(file.extension);
     const isVideo = file.mimeType.startsWith('video/') || ['mp4', 'webm', 'ogg', 'mov', 'm4v'].includes(file.extension);
-    
+
     if ((isAudio || isVideo) && file.content) {
       let url = '';
       if (file.content.startsWith('data:')) {
@@ -196,13 +196,13 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     if (!content) return { headers: [], rows: [] };
     const lines = content.split('\n').filter(l => l.trim() !== '');
     if (lines.length === 0) return { headers: [], rows: [] };
-    
+
     const parseLine = (line: string) => {
       const result = [];
       let current = '';
       let inQuotes = false;
       const delimiter = file.extension === 'tsv' ? '\t' : ',';
-      
+
       for (let i = 0; i < line.length; i++) {
         const char = line[i];
         if (char === '"') {
@@ -217,7 +217,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
       result.push(current.trim().replace(/^"|"$/g, ''));
       return result;
     };
-    
+
     const headers = parseLine(lines[0]);
     const rows = lines.slice(1).map(parseLine);
     return { headers, rows };
@@ -228,7 +228,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     if (!code) return <span className="text-slate-500">// Empty file</span>;
     const keywords = ['const', 'let', 'var', 'function', 'return', 'import', 'export', 'from', 'class', 'default', 'extends', 'if', 'else', 'for', 'while', 'try', 'catch', 'def', 'import', 'as', 'with', 'public', 'private', 'interface', 'type', 'string', 'number', 'boolean', 'any'];
     const lines = code.split('\n');
-    
+
     return lines.map((line, idx) => {
       if (line.trim().startsWith('//') || line.trim().startsWith('#') || line.trim().startsWith('/*') || line.trim().startsWith('*')) {
         return (
@@ -238,11 +238,11 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           </div>
         );
       }
-      
+
       const words = line.split(/(\s+|=|\+|-|\*|\/|\(|\)|\{|\}|\[|\]|;|,|\.|\"|\')/);
       let inDoubleQuote = false;
       let inSingleQuote = false;
-      
+
       const lineSpan = words.map((token, wIdx) => {
         if (token === '"') {
           inDoubleQuote = !inDoubleQuote;
@@ -279,7 +279,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   // Markdown Parser
   const parseInlineMarkdown = (text: string) => {
     let parts: (string | React.ReactNode)[] = [text];
-    
+
     // Bold **text**
     parts = parts.flatMap(part => {
       if (typeof part !== 'string') return part;
@@ -348,7 +348,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     const lines = text.split('\n');
     let inCodeBlock = false;
     let codeLines: string[] = [];
-    
+
     return lines.map((line, index) => {
       if (line.trim().startsWith('```')) {
         if (inCodeBlock) {
@@ -365,12 +365,12 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           return null;
         }
       }
-      
+
       if (inCodeBlock) {
         codeLines.push(line);
         return null;
       }
-      
+
       if (line.startsWith('# ')) {
         return <h1 key={index} className="text-xl font-bold text-white border-b border-slate-800 pb-1 mt-5 mb-2.5">{parseInlineMarkdown(line.slice(2))}</h1>;
       }
@@ -380,7 +380,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
       if (line.startsWith('### ')) {
         return <h3 key={index} className="text-base font-bold text-slate-200 mt-3 mb-1">{parseInlineMarkdown(line.slice(4))}</h3>;
       }
-      
+
       if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
         return (
           <li key={index} className="list-disc ml-5 text-slate-300 my-1 font-sans">
@@ -388,7 +388,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           </li>
         );
       }
-      
+
       if (/^\d+\.\s/.test(line.trim())) {
         const match = line.trim().match(/^(\d+)\.\s(.*)/);
         return (
@@ -397,11 +397,11 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           </li>
         );
       }
-      
+
       if (!line.trim()) {
         return <div key={index} className="h-3" />;
       }
-      
+
       return (
         <p key={index} className="text-slate-300 leading-relaxed text-sm my-2 font-sans">
           {parseInlineMarkdown(line)}
@@ -425,7 +425,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         <div className="flex flex-col space-y-4 items-center w-full">
           {/* Controls Bar */}
           <div className="flex items-center space-x-3 bg-slate-900 border border-slate-800 rounded-lg px-4 py-1.5 text-xs text-slate-300">
-            <button 
+            <button
               onClick={() => setZoom(z => Math.max(0.25, z - 0.25))}
               disabled={zoom <= 0.25}
               className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -434,7 +434,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
               <ZoomOut className="h-4 w-4" />
             </button>
             <span className="font-mono min-w-[48px] text-center">{Math.round(zoom * 100)}%</span>
-            <button 
+            <button
               onClick={() => setZoom(z => Math.min(3, z + 0.25))}
               disabled={zoom >= 3.0}
               className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -443,14 +443,14 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
               <ZoomIn className="h-4 w-4" />
             </button>
             <div className="h-4 w-px bg-slate-800"></div>
-            <button 
+            <button
               onClick={() => setRotation(r => (r + 90) % 360)}
               className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors flex items-center space-x-1"
               title="Rotate Right"
             >
               <RotateCw className="h-4 w-4" />
             </button>
-            <button 
+            <button
               onClick={() => { setZoom(1); setRotation(0); }}
               className="p-1 hover:bg-slate-800 rounded text-[10px] text-slate-400 hover:text-white font-semibold transition-colors"
             >
@@ -460,17 +460,17 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 
           {/* Canvas Wrapper with checkered transparent pattern */}
           <div className="w-full flex items-center justify-center p-6 bg-slate-950/60 rounded-xl border border-slate-800 overflow-auto max-h-[60vh] relative min-h-[250px]">
-            <div 
-              className="absolute inset-0 opacity-[0.04] pointer-events-none" 
+            <div
+              className="absolute inset-0 opacity-[0.04] pointer-events-none"
               style={{
                 backgroundImage: 'conic-gradient(#ffffff 0.25turn, #000000 0.25turn 0.5turn, #ffffff 0.5turn 0.75turn, #000000 0.75turn)',
                 backgroundSize: '24px 24px'
               }}
             />
-            <img 
-              src={file.content} 
-              alt={file.name} 
-              className="max-w-full max-h-[50vh] object-contain rounded shadow-lg transition-transform duration-250 ease-out" 
+            <img
+              src={file.content}
+              alt={file.name}
+              className="max-w-full max-h-[50vh] object-contain rounded shadow-lg transition-transform duration-250 ease-out"
               style={{ transform: `scale(${zoom}) rotate(${rotation}deg)` }}
             />
           </div>
@@ -483,8 +483,8 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     if (isAudio) {
       return (
         <div className="flex flex-col items-center justify-center p-8 bg-slate-900/60 rounded-xl border border-slate-800/80 text-center space-y-6">
-          <audio 
-            ref={audioRef} 
+          <audio
+            ref={audioRef}
             src={mediaUrl}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={handleLoadedMetadata}
@@ -513,7 +513,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
             {/* Timeline Slider */}
             <div className="flex items-center space-x-3 text-xs">
               <span className="font-mono text-slate-400 w-10 text-right">{formatTime(currentTime)}</span>
-              <input 
+              <input
                 type="range"
                 min={0}
                 max={duration || 100}
@@ -534,7 +534,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                 >
                   {isMuted ? <VolumeX className="h-4 w-4 text-red-400" /> : <Volume2 className="h-4 w-4" />}
                 </button>
-                <input 
+                <input
                   type="range"
                   min={0}
                   max={1}
@@ -566,9 +566,9 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
       return (
         <div className="flex flex-col space-y-3 w-full">
           <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950 shadow-2xl relative max-h-[60vh] flex items-center justify-center">
-            <video 
-              src={mediaUrl} 
-              controls 
+            <video
+              src={mediaUrl}
+              controls
               className="w-full max-h-[58vh] outline-none"
               poster=""
             />
@@ -585,7 +585,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     const isCSV = file.extension === 'csv' || file.extension === 'tsv' || file.mimeType === 'text/csv' || file.mimeType === 'text/tab-separated-values';
     if (isCSV && file.content) {
       const { headers, rows } = parseCSV(file.content);
-      const filteredRows = rows.filter(row => 
+      const filteredRows = rows.filter(row =>
         row.some(cell => cell.toLowerCase().includes(csvSearch.toLowerCase()))
       );
       const totalPages = Math.ceil(filteredRows.length / csvRowsPerPage);
@@ -599,11 +599,11 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
               <span>Spreadsheet Grid Viewer</span>
               <span className="text-[10px] text-slate-400 font-mono font-normal">({filteredRows.length} rows found)</span>
             </div>
-            
+
             {/* Search filter */}
             <div className="relative">
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-500" />
-              <input 
+              <input
                 type="text"
                 placeholder="Search rows..."
                 value={csvSearch}
@@ -771,25 +771,22 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         <div className="flex items-center border-b border-slate-800 px-6 bg-[#060a17] text-xs font-medium">
           <button
             onClick={() => setActiveTab('preview')}
-            className={`py-2.5 px-3 border-b-2 font-semibold transition-colors ${
-              activeTab === 'preview' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            className={`py-2.5 px-3 border-b-2 font-semibold transition-colors ${activeTab === 'preview' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
           >
             File Preview
           </button>
           <button
             onClick={() => setActiveTab('details')}
-            className={`py-2.5 px-3 border-b-2 font-semibold transition-colors ${
-              activeTab === 'details' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            className={`py-2.5 px-3 border-b-2 font-semibold transition-colors ${activeTab === 'details' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
           >
             Metadata Details
           </button>
           <button
             onClick={() => setActiveTab('security')}
-            className={`py-2.5 px-3 border-b-2 font-semibold transition-colors ${
-              activeTab === 'security' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            className={`py-2.5 px-3 border-b-2 font-semibold transition-colors ${activeTab === 'security' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
           >
             Access Security & Permissions
           </button>
@@ -873,11 +870,10 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                     return (
                       <span
                         key={role}
-                        className={`px-3 py-1 rounded border text-xs font-mono font-medium ${
-                          isAllowed
-                            ? 'bg-emerald-950/80 border-emerald-800 text-emerald-300'
-                            : 'bg-slate-900 border-slate-800 text-slate-500 line-through'
-                        }`}
+                        className={`px-3 py-1 rounded border text-xs font-mono font-medium ${isAllowed
+                          ? 'bg-emerald-950/80 border-emerald-800 text-emerald-300'
+                          : 'bg-slate-900 border-slate-800 text-slate-500 line-through'
+                          }`}
                       >
                         {role}
                       </span>
