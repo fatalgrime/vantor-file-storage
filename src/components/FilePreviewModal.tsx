@@ -30,7 +30,8 @@ import {
   ChevronRight,
   Music,
   Video,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Info
 } from 'lucide-react';
 import { VantorFile, UserRole, VantorFolder, VantorRepository } from '../lib/types';
 import { canReadItem, ALL_USER_ROLES } from '../lib/authorization';
@@ -758,13 +759,6 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
               </button>
             )}
             <button
-              onClick={handleCopyLink}
-              className="flex items-center space-x-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors"
-            >
-              {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5 text-slate-400" />}
-              <span>{copied ? 'Copied Share Link' : 'Copy Share Link'}</span>
-            </button>
-            <button
               onClick={onClose}
               className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
             >
@@ -858,6 +852,17 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                   {file.permissionLevel === 'admin_only' && 'Strictly restricted to users with System Administrator privileges.'}
                   {file.permissionLevel === 'role_restricted' && `Restricted to assigned roles: ${file.allowedRoles.join(', ')}.`}
                 </p>
+              </div>
+              <div className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-4 font-sans text-xs">
+                <div className="flex items-start space-x-2.5">
+                  <Info className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h5 className="font-semibold text-amber-200">Shareable Links & Access Control</h5>
+                    <p className="text-slate-300 leading-relaxed">
+                      To create and manage shareable links for this file, click the horizontal three-dots menu icon (<span className="font-semibold text-white">•••</span>) on the file, navigate to <span className="font-semibold text-white">Permissions</span>, and select the <span className="font-semibold text-amber-300">Shareable Links</span> tab.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800 space-y-2">
