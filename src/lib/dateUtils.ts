@@ -54,16 +54,23 @@ export function formatFriendlyDate(dateInput: string | Date | undefined | null):
   }
 }
 
+export interface FormatRelativeTimeOptions {
+  concise?: boolean;
+}
+
 /**
  * Formats a timestamp into an accurate relative or formatted date/time string:
  * - "today at hh:mm AM/PM" if updated today
  * - "yesterday at hh:mm AM/PM" if updated yesterday
  * - "X days ago" if updated 2 to 6 days ago
  * - "MMM d, yyyy" if older
+ * If options.concise is true:
+ * - "Just now", "5m ago", "2h ago", "Yesterday", "3d ago", "Aug 15"
  */
 export function formatRelativeTime(
   timestamp?: string | Date | null,
-  fallbackCreatedAt?: string | Date | null
+  fallbackCreatedAt?: string | Date | null,
+  options?: FormatRelativeTimeOptions
 ): string {
   let date = parseDate(timestamp);
   if (!date && fallbackCreatedAt) {
@@ -78,11 +85,36 @@ export function formatRelativeTime(
   }
 
   const now = new Date();
+  const diffMs = Math.max(0, now.getTime() - date.getTime());
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+
+  if (options?.concise) {
+    if (diffSec < 60) {
+      return 'Just now';
+    } else if (diffMin < 60) {
+      return `${diffMin}m ago`;
+    } else if (diffHour < 24) {
+      return `${diffHour}h ago`;
+    }
+  }
+
   const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const startOfNow = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   const dayDiff = Math.floor((startOfNow - startOfDate) / (1000 * 60 * 60 * 24));
+
+  if (options?.concise) {
+    if (dayDiff === 1) return 'Yesterday';
+    if (dayDiff > 1 && dayDiff < 7) return `${dayDiff}d ago`;
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+    });
+  }
 
   if (dayDiff === 0) {
     return `today at ${timeStr}`;
@@ -195,5 +227,52 @@ export function formatBytes(bytes: number, decimals: number = 1): string {
   // If the computed index is beyond sizes length, bound it
   const index = Math.min(i, sizes.length - 1);
   return parseFloat((bytes / Math.pow(k, index)).toFixed(dm)) + ' ' + sizes[index];
+}
+
+/**
+ * Sanitizes repositories, files, and folders by replacing any legacy non-ISO updatedAt strings
+ * with valid ISO 8601 date strings.
+ */
+export function sanitizeLegacyStateTimestamps(state: {
+  repositories: VantorRepository[];
+  files: VantorFile[];
+  folders: VantorFolder[];
+  auditLogs: AuditLog[];
+}): {
+  repositories: VantorRepository[];
+  files: VantorFile[];
+  folders: VantorFolder[];
+  hasChanges: boolean;
+} {
+  let hasChanges = false;
+
+  const files = state.files.map((file) => {
+    if (!parseDate(file.updatedAt)) {
+      hasChanges = true;
+      const validIso = parseDate(file.createdAt)?.toISOString() || new Date().toISOString();
+      return { ...file, updatedAt: validIso };
+    }
+    return file;
+  });
+
+  const folders = state.folders.map((folder) => {
+    if (!parseDate(folder.updatedAt)) {
+      hasChanges = true;
+      const validIso = parseDate(folder.createdAt)?.toISOString() || new Date().toISOString();
+      return { ...folder, updatedAt: validIso };
+    }
+    return folder;
+  });
+
+  const repositories = state.repositories.map((repo) => {
+    if (!parseDate(repo.updatedAt)) {
+      hasChanges = true;
+      const computedLatestIso = getRepositoryLastUpdated(repo, files, folders, state.auditLogs);
+      return { ...repo, updatedAt: computedLatestIso };
+    }
+    return repo;
+  });
+
+  return { repositories, files, folders, hasChanges };
 }
 

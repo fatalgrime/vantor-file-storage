@@ -2,24 +2,24 @@
 
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  Folder, 
-  FileText, 
-  File, 
-  FileCode, 
-  FileArchive, 
-  FileCheck, 
-  Image as ImageIcon, 
-  MoreHorizontal, 
-  Download, 
-  Eye, 
-  Trash2, 
-  Edit, 
-  ShieldAlert, 
-  Copy, 
-  Lock, 
-  Users, 
-  CheckSquare, 
+import {
+  Folder,
+  FileText,
+  File,
+  FileCode,
+  FileArchive,
+  FileCheck,
+  Image as ImageIcon,
+  MoreHorizontal,
+  Download,
+  Eye,
+  Trash2,
+  Edit,
+  ShieldAlert,
+  Copy,
+  Lock,
+  Users,
+  CheckSquare,
   Square,
   ArrowUpDown,
   FolderInput
@@ -383,7 +383,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                     <td className="px-3 py-2 text-right text-slate-400 font-mono">{folder.formattedSize}</td>
 
                     {/* Modified */}
-                    <td className="px-3 py-2 text-right text-slate-400">{formatRelativeTime(folder.updatedAt, folder.createdAt)}</td>
+                    <td className="px-3 py-2 text-right text-slate-400">{formatRelativeTime(folder.updatedAt, folder.createdAt, { concise: true })}</td>
                   </tr>
                 );
               })}
@@ -438,7 +438,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                     <td className="px-3 py-2 text-right text-slate-400 font-mono">{file.formattedSize}</td>
 
                     {/* Modified */}
-                    <td className="px-3 py-2 text-right text-slate-400">{formatRelativeTime(file.updatedAt, file.createdAt)}</td>
+                    <td className="px-3 py-2 text-right text-slate-400">{formatRelativeTime(file.updatedAt, file.createdAt, { concise: true })}</td>
                   </tr>
                 );
               })}
@@ -461,9 +461,8 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             return (
               <div
                 key={folder.id}
-                className={`relative rounded-xl border p-4 transition-all hover:border-blue-500/80 bg-[#070d1d] cursor-pointer group ${
-                  isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-950/20' : 'border-[#1e3059]'
-                }`}
+                className={`relative rounded-xl border p-4 transition-all hover:border-blue-500/80 bg-[#070d1d] cursor-pointer group ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-950/20' : 'border-[#1e3059]'
+                  }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3 flex-1 min-w-0" onClick={() => onOpenFolder(folder.id)}>
@@ -499,9 +498,8 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             return (
               <div
                 key={file.id}
-                className={`relative rounded-xl border p-4 transition-all hover:border-blue-500/80 bg-[#070d1d] group ${
-                  isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-950/20' : 'border-[#1e3059]'
-                }`}
+                className={`relative rounded-xl border p-4 transition-all hover:border-blue-500/80 bg-[#070d1d] group ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-950/20' : 'border-[#1e3059]'
+                  }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3 cursor-pointer flex-1 min-w-0" onClick={() => onPreviewFile(file)}>
@@ -529,7 +527,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-800/80 text-[11px] text-slate-400">
-                  <span>Modified: {formatRelativeTime(file.updatedAt, file.createdAt)}</span>
+                  <span>Modified: {formatRelativeTime(file.updatedAt, file.createdAt, { concise: true })}</span>
                   <button onClick={() => onDownloadFile(file)} className="text-blue-400 hover:underline flex items-center space-x-1">
                     <Download className="h-3 w-3" />
                     <span>Get</span>

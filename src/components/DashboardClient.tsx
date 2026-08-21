@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { SignInButton, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { Navbar } from './Navbar';
-import { formatBytes, formatRelativeTime, getRepositoryLastUpdated, matchesModifiedFilter } from '../lib/dateUtils';
+import { formatBytes, formatRelativeTime, getRepositoryLastUpdated, matchesModifiedFilter, sanitizeLegacyStateTimestamps } from '../lib/dateUtils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { HelpCircle, X, Mail, Activity, Upload, Trash2, Key, Folder } from 'lucide-react';
 import { HeroChangelog } from './HeroChangelog';
@@ -157,9 +157,31 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         }
 
         const data = await response.json() as PersistedState;
-        const currentFiles = data.files || [];
-        const currentFolders = data.folders || [];
-        const currentRepositories = data.repositories || [];
+        const rawFiles = data.files || [];
+        const rawFolders = data.folders || [];
+        const rawRepositories = data.repositories || [];
+        const rawAuditLogs = data.auditLogs || [];
+
+        const {
+          files: currentFiles,
+          folders: currentFolders,
+          repositories: currentRepositories,
+          hasChanges: legacySanitized,
+        } = sanitizeLegacyStateTimestamps({
+          files: rawFiles,
+          folders: rawFolders,
+          repositories: rawRepositories,
+          auditLogs: rawAuditLogs,
+        });
+
+        if (legacySanitized) {
+          persistState({
+            files: currentFiles,
+            folders: currentFolders,
+            repositories: currentRepositories,
+          }).catch((error) => console.error('Failed to persist sanitized timestamps:', error));
+        }
+
         setFiles(currentFiles);
         setFolders(currentFolders);
         setRepositories(currentRepositories);
@@ -168,7 +190,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         setCurrentRepositoryId(requestedRepositoryExists ? initialRepositoryId : availableRepositories[0]?.id || '');
         setChangelog(data.changelog || { title: '', subtitle: '', releases: [] });
         setChangelogs(data.changelogs || {});
-        setAuditLogs(data.auditLogs || []);
+        setAuditLogs(rawAuditLogs);
         setShares(data.shares || []);
 
         const loadedUsers = data.users || [];
