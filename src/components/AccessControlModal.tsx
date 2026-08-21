@@ -296,8 +296,8 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                   >
                     <Lock className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
                     <div>
-                      <h4 className="font-bold text-white text-xs">Private</h4>
-                      <p className="text-[11px] text-slate-400">Restricted exclusively to explicitly authorized users.</p>
+                      <h4 className="font-bold text-white text-xs">Admin Only</h4>
+                      <p className="text-[11px] text-slate-400">Restricted exclusively to Platform Administrators.</p>
                     </div>
                   </div>
                 </div>

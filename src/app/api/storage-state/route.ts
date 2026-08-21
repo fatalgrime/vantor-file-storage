@@ -251,6 +251,9 @@ export async function GET() {
   }
 }
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
 export async function PATCH(request: Request) {
   const { userId } = await auth();
 
@@ -261,6 +264,18 @@ export async function PATCH(request: Request) {
   try {
     const sql = await ensureState();
     const patch = await request.json();
+
+    // Sanitize large base64 contents from JSON state before persisting to database
+    if (Array.isArray(patch.files)) {
+      patch.files = patch.files.map((file: VantorFile) => {
+        if (file.content && file.content.length > 200000 && file.content.startsWith('data:')) {
+          const { content: _c, ...rest } = file;
+          return rest;
+        }
+        return file;
+      });
+    }
+
     const currentRows = await sql`
       SELECT data
       FROM vantor_app_state

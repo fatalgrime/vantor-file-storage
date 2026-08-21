@@ -5,6 +5,7 @@ import { SignInButton, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { Navbar } from './Navbar';
 import { formatBytes, formatRelativeTime, getRepositoryLastUpdated, matchesModifiedFilter, sanitizeLegacyStateTimestamps } from '../lib/dateUtils';
+import { detectFileType } from '../lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { HelpCircle, X, Mail, Activity, Upload, Trash2, Key, Folder } from 'lucide-react';
 import { HeroChangelog } from './HeroChangelog';
@@ -797,16 +798,22 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
       }
     }
 
+    const fileInfo = detectFileType(newFileData.name || 'Untitled File', newFileData.mimeType);
+
+    if (finalContent && finalContent.length > 200000 && finalContent.startsWith('data:')) {
+      finalContent = undefined;
+    }
+
     const newFile: VantorFile = {
       id: `file-${Date.now()}`,
       name: newFileData.name || 'Untitled File',
       originalName: newFileData.originalName || newFileData.name || 'Untitled File',
-      fileType: newFileData.fileType || 'Text Document',
-      category: newFileData.category || 'General',
-      extension: newFileData.extension || 'txt',
-      mimeType: newFileData.mimeType || 'text/plain',
+      fileType: fileInfo.fileType,
+      category: newFileData.category || fileInfo.category,
+      extension: fileInfo.extension,
+      mimeType: fileInfo.mimeType,
       size: newFileData.size || 1024,
-      formattedSize: newFileData.formattedSize || '1.0 KB',
+      formattedSize: newFileData.formattedSize || formatBytes(newFileData.size || 1024),
       folderId: destFolderId,
       description: newFileData.description || 'Uploaded asset',
       tags: newFileData.tags || ['upload'],

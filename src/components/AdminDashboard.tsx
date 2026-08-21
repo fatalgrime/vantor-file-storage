@@ -33,9 +33,10 @@ import {
   UserCheck
 } from 'lucide-react';
 import { VantorFile, VantorFolder, AuditLog, PermissionLevel, UserRole, VantorUser, Announcement, AnnouncementType } from '../lib/types';
+import { detectFileType, formatBytes } from '../lib/utils';
 import { ALL_USER_ROLES } from '../lib/authorization';
 import { useToast } from './ToastProvider';
-import { formatFriendlyDate, formatBytes } from '../lib/dateUtils';
+import { formatFriendlyDate } from '../lib/dateUtils';
 import { TOTAL_STORAGE_CAPACITY_BYTES, MAX_SINGLE_FILE_BYTES } from '../lib/db';
 import { CustomSelect } from './CustomSelect';
 
@@ -133,18 +134,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return;
     }
 
-    const ext = fileName.includes('.') ? fileName.split('.').pop() || 'txt' : 'txt';
-    const isMd = ext === 'md';
+    const info = detectFileType(fileName.trim(), fileMime);
 
     onUploadFile({
       name: fileName.trim(),
       originalName: fileName.trim(),
-      fileType: isMd ? 'Markdown document' : `${ext.toUpperCase()} File`,
-      category: fileCategory,
-      extension: ext,
-      mimeType: fileMime,
+      fileType: info.fileType,
+      category: fileCategory || info.category,
+      extension: info.extension,
+      mimeType: info.mimeType,
       size: fileSize,
-      formattedSize: fileSize > 1024 * 1024 ? `${(fileSize / (1024 * 1024)).toFixed(2)} MB` : `${(fileSize / 1024).toFixed(1)} KB`,
+      formattedSize: formatBytes(fileSize),
       folderId: targetFolderId === 'root' ? null : targetFolderId,
       description: fileDescription || 'Vantor cloud secure asset file.',
       tags: fileTags.split(',').map((t) => t.trim()).filter(Boolean),
@@ -182,10 +182,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return;
     }
 
+    const info = detectFileType(file.name, file.type);
     setIsProcessingFile(true);
     setFileName(file.name);
     setFileSize(file.size);
-    setFileMime(file.type || 'application/octet-stream');
+    setFileMime(info.mimeType);
+    setFileCategory(info.category);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -349,9 +351,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <Megaphone className={`h-3.5 w-3.5 ${activeTab === 'announcements' ? 'text-blue-400' : 'text-slate-400'}`} />
             <span>Announcements</span>
             {activeAnnouncementsCount > 0 && (
-              <span className={`ml-1 rounded-full border px-1.5 py-0.2 text-[10px] font-mono ${
-                activeTab === 'announcements' ? 'bg-blue-900/80 border-blue-600 text-blue-300' : 'bg-slate-800 border-slate-700 text-slate-400'
-              }`}>
+              <span className={`ml-1 rounded-full border px-1.5 py-0.2 text-[10px] font-mono ${activeTab === 'announcements' ? 'bg-blue-900/80 border-blue-600 text-blue-300' : 'bg-slate-800 border-slate-700 text-slate-400'
+                }`}>
                 {activeAnnouncementsCount}
               </span>
             )}
@@ -441,7 +442,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       { value: 'public', label: 'Public (Anyone with link)', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
                       { value: 'authenticated', label: 'Authenticated Users', icon: <UserCheck className="h-3.5 w-3.5 text-blue-400" /> },
                       { value: 'role_restricted', label: 'Role Restricted (Specific Roles)', icon: <Shield className="h-3.5 w-3.5 text-amber-400" /> },
-                      { value: 'private', label: 'Private (Authorized Users Only)', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
+                      { value: 'private', label: 'Admin Only', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
                     ]}
                   />
                 </div>
@@ -529,7 +530,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     { value: 'public', label: 'Public (Anyone with link)', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
                     { value: 'authenticated', label: 'Authenticated Users', icon: <UserCheck className="h-3.5 w-3.5 text-blue-400" /> },
                     { value: 'role_restricted', label: 'Role Restricted', icon: <Shield className="h-3.5 w-3.5 text-amber-400" /> },
-                    { value: 'private', label: 'Private (Authorized Users Only)', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
+                    { value: 'private', label: 'Admin Only', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
                   ]}
                 />
               </div>
@@ -681,16 +682,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <div
                         key={announcement.id}
                         className={`p-4 rounded-xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 ${announcement.isActive
-                            ? 'bg-slate-900/80 border-slate-700/80 shadow-md'
-                            : 'bg-slate-950/40 border-slate-800/60 opacity-70'
+                          ? 'bg-slate-900/80 border-slate-700/80 shadow-md'
+                          : 'bg-slate-950/40 border-slate-800/60 opacity-70'
                           }`}
                       >
                         <div className="space-y-1.5 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${announcement.type === 'info' ? 'bg-blue-950 border border-blue-700 text-blue-300' :
-                                announcement.type === 'warning' ? 'bg-amber-950 border border-amber-700 text-amber-300' :
-                                  announcement.type === 'alert' ? 'bg-rose-950 border border-rose-700 text-rose-300' :
-                                    'bg-emerald-950 border border-emerald-700 text-emerald-300'
+                              announcement.type === 'warning' ? 'bg-amber-950 border border-amber-700 text-amber-300' :
+                                announcement.type === 'alert' ? 'bg-rose-950 border border-rose-700 text-rose-300' :
+                                  'bg-emerald-950 border border-emerald-700 text-emerald-300'
                               }`}>
                               {announcement.type}
                             </span>
@@ -733,8 +734,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 });
                               }}
                               className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${announcement.isActive
-                                  ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-                                  : 'bg-emerald-950 border-emerald-700 text-emerald-200 hover:bg-emerald-900'
+                                ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                                : 'bg-emerald-950 border-emerald-700 text-emerald-200 hover:bg-emerald-900'
                                 }`}
                             >
                               {announcement.isActive ? <EyeOff className="h-3.5 w-3.5 text-amber-400" /> : <Eye className="h-3.5 w-3.5 text-emerald-400" />}
