@@ -753,21 +753,24 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   };
 
   // CRUD Operations
-  const handleUploadFile = (newFileData: Partial<VantorFile>) => {
+  const handleUploadFile = async (newFileData: Partial<VantorFile>) => {
     const destFolderId = newFileData.folderId !== undefined ? newFileData.folderId : currentFolderId;
     const destFolder = destFolderId ? folders.find((f) => f.id === destFolderId) : undefined;
     const hasWriteAccess = destFolder
       ? canEditItem(effectiveRole, currentUserId, destFolder, folders, currentRepository)
-      : canEditCurrentRepository;
+      : (currentRepository ? canEditCurrentRepository : true);
 
     if (!hasWriteAccess) {
       addToast({ type: 'error', title: 'Access denied', message: 'You do not have editor permissions in this location.' });
       return;
     }
+
+    const targetRepoId = currentRepositoryId || DEFAULT_REPOSITORY_ID;
+
     const newFile: VantorFile = {
       id: `file-${Date.now()}`,
       name: newFileData.name || 'Untitled File',
-      originalName: newFileData.name || 'Untitled File',
+      originalName: newFileData.originalName || newFileData.name || 'Untitled File',
       fileType: newFileData.fileType || 'Text Document',
       category: newFileData.category || 'General',
       extension: newFileData.extension || 'txt',
@@ -778,7 +781,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
       description: newFileData.description || 'Uploaded asset',
       tags: newFileData.tags || ['upload'],
       content: newFileData.content,
-      repositoryId: currentRepositoryId,
+      repositoryId: targetRepoId,
       permissionLevel: newFileData.permissionLevel || 'public',
       allowedRoles: newFileData.allowedRoles || ALL_USER_ROLES,
       allowedUserIds: [],
@@ -791,25 +794,38 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
 
     const nextFiles = [newFile, ...files];
     const nextLogs = [createAuditLog('UPLOAD', newFile.name, 'file', `Uploaded file (${newFile.formattedSize})`), ...auditLogs];
-    const nextRepositories = touchRepository(currentRepositoryId);
+    const nextRepositories = touchRepository(targetRepoId);
+
     setFiles(nextFiles);
     setAuditLogs(nextLogs);
     setRepositories(nextRepositories);
-    persistState({ files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories }).catch((error) => setLoadError(error.message));
-    addToast({ type: 'success', title: 'File uploaded', message: `"${newFile.name}" added to repository.` });
+
+    try {
+      await persistState({ files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories });
+      addToast({ type: 'success', title: 'File uploaded', message: `"${newFile.name}" added to repository.` });
+    } catch (error) {
+      setFiles(files);
+      setAuditLogs(auditLogs);
+      const msg = error instanceof Error ? error.message : 'Failed to save file to database.';
+      addToast({ type: 'error', title: 'Upload Failed', message: msg });
+      setLoadError(msg);
+    }
   };
 
-  const handleCreateFolder = (newFolderData: Partial<VantorFolder>) => {
+  const handleCreateFolder = async (newFolderData: Partial<VantorFolder>) => {
     const destFolderId = newFolderData.parentId !== undefined ? newFolderData.parentId : currentFolderId;
     const destFolder = destFolderId ? folders.find((f) => f.id === destFolderId) : undefined;
     const hasWriteAccess = destFolder
       ? canEditItem(effectiveRole, currentUserId, destFolder, folders, currentRepository)
-      : canEditCurrentRepository;
+      : (currentRepository ? canEditCurrentRepository : true);
 
     if (!hasWriteAccess) {
       addToast({ type: 'error', title: 'Access denied', message: 'You do not have editor permissions in this location.' });
       return;
     }
+
+    const targetRepoId = currentRepositoryId || DEFAULT_REPOSITORY_ID;
+
     const newFolder: VantorFolder = {
       id: `folder-${Date.now()}`,
       name: newFolderData.name || 'New Folder',
@@ -823,17 +839,27 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       createdBy: displayName,
-      repositoryId: currentRepositoryId,
+      repositoryId: targetRepoId,
     };
 
     const nextFolders = [...folders, newFolder];
     const nextLogs = [createAuditLog('FOLDER_CREATE', newFolder.name, 'folder', `Created new folder directory`), ...auditLogs];
-    const nextRepositories = touchRepository(currentRepositoryId);
+    const nextRepositories = touchRepository(targetRepoId);
+
     setFolders(nextFolders);
     setAuditLogs(nextLogs);
     setRepositories(nextRepositories);
-    persistState({ folders: nextFolders, auditLogs: nextLogs, repositories: nextRepositories }).catch((error) => setLoadError(error.message));
-    addToast({ type: 'success', title: 'Folder created', message: `"${newFolder.name}" directory created.` });
+
+    try {
+      await persistState({ folders: nextFolders, auditLogs: nextLogs, repositories: nextRepositories });
+      addToast({ type: 'success', title: 'Folder created', message: `"${newFolder.name}" directory created.` });
+    } catch (error) {
+      setFolders(folders);
+      setAuditLogs(auditLogs);
+      const msg = error instanceof Error ? error.message : 'Failed to save folder to database.';
+      addToast({ type: 'error', title: 'Creation Failed', message: msg });
+      setLoadError(msg);
+    }
   };
 
   const getUpdatedLabel = () => {

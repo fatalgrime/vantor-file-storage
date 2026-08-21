@@ -17,13 +17,22 @@ import { VantorFile, VantorFolder, VantorRepository, VantorUser, ShareLink, Anno
 const STATE_ID = 'default';
 
 const defaultState = {
-  files: [] as VantorFile[],
-  folders: [] as VantorFolder[],
-  repositories: [] as VantorRepository[],
-  changelog: { title: '', subtitle: '', releases: [] },
+  files: INITIAL_FILES as VantorFile[],
+  folders: INITIAL_FOLDERS as VantorFolder[],
+  repositories: (INITIAL_REPOSITORIES.length > 0 ? INITIAL_REPOSITORIES : [{
+    id: DEFAULT_REPOSITORY_ID,
+    name: 'Vantor Root Repository',
+    description: 'Default root storage workspace',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    createdBy: 'System Operator',
+    assignedUserIds: [],
+    assignedRoles: ['admin', 'author', 'viewer'],
+  }]) as VantorRepository[],
+  changelog: INITIAL_HERO_CHANGELOG,
   changelogs: {} as Record<string, any>,
-  auditLogs: [] as any[],
-  users: [] as VantorUser[],
+  auditLogs: INITIAL_AUDIT_LOGS as any[],
+  users: INITIAL_USERS as VantorUser[],
   announcements: INITIAL_ANNOUNCEMENTS as Announcement[],
   settings: {
     theme: 'dark',
@@ -104,8 +113,13 @@ const validateContentPatch = (
     }
 
     const repositoryId = getRepositoryId(nextItem);
+    if (repositoryId === DEFAULT_REPOSITORY_ID || repositoryId === 'repo-default') {
+      if (role === 'viewer') return 'Viewers do not have write access.';
+      continue;
+    }
+
     const repository = repositories.find((candidate) => candidate.id === repositoryId);
-    if (!repository || !canEditRepository(role, userId, repository)) {
+    if (repository && !canEditRepository(role, userId, repository)) {
       return 'You do not have editing access to this repository.';
     }
   }
