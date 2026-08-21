@@ -11,8 +11,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
-  Sparkles
+  ExternalLink
 } from 'lucide-react';
 
 interface AnnouncementBannerProps {
@@ -98,18 +97,19 @@ export const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({
               {style.icon}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1 text-xs">
               <span className={`inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide font-mono ${style.badge}`}>
                 {currentAnnouncement.type}
               </span>
 
-              <h3 className="text-xs font-bold text-white tracking-tight truncate">
-                {currentAnnouncement.title}
-              </h3>
-
-              <span className="text-xs text-slate-300 font-normal">
-                {currentAnnouncement.content}
-              </span>
+              <div className="flex items-center space-x-1.5 min-w-0 flex-wrap">
+                <span className="font-bold text-white tracking-tight">
+                  {currentAnnouncement.title}:
+                </span>
+                <span className="text-slate-300 font-normal">
+                  {currentAnnouncement.content}
+                </span>
+              </div>
 
               {visibleAnnouncements.length > 1 && (
                 <span className="text-[10px] font-mono font-semibold text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
@@ -131,17 +131,6 @@ export const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({
                 <span>{currentAnnouncement.linkText || 'Details'}</span>
                 <ExternalLink className="h-3 w-3" />
               </a>
-            )}
-
-            {isAdmin && onOpenAdminDashboard && (
-              <button
-                onClick={() => onOpenAdminDashboard('announcements')}
-                className="inline-flex items-center space-x-1 rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:bg-slate-700 transition-all"
-                title="Manage Announcements"
-              >
-                <Sparkles className="h-3 w-3 text-blue-400" />
-                <span className="hidden md:inline">Manage</span>
-              </button>
             )}
 
             {visibleAnnouncements.length > 1 && (

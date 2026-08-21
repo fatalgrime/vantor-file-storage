@@ -259,7 +259,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
       <div className="relative w-full max-w-4xl rounded-xl border border-[#1e3059] bg-[#070c18] shadow-2xl overflow-hidden flex flex-col min-h-[550px] max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#1e3059] px-6 py-4 bg-[#090f22]">
+        <div className="flex items-center justify-between border-b border-[#1e3059] px-6 py-4 bg-[#090f22] flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-900/60 border border-blue-700/80 text-blue-400">
               <ShieldCheck className="h-5 w-5" />
@@ -276,7 +276,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         {/* Stats & Storage Capacity Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 px-6 py-3 border-b border-slate-800/80 bg-[#060a17] text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 px-6 py-3 border-b border-slate-800/80 bg-[#060a17] text-xs flex-shrink-0">
           {/* Storage Capacity progress meter */}
           <div className="md:col-span-2 flex flex-col justify-center space-y-1 bg-slate-900/40 p-2 rounded-lg border border-slate-800/60">
             <div className="flex items-center justify-between">
@@ -322,7 +322,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center overflow-x-auto border-b border-slate-800 px-6 bg-[#080d1c] text-xs font-medium scrollbar-none w-full">
+        <div className="flex items-center overflow-x-auto border-b border-slate-800 px-6 bg-[#080d1c] text-xs font-medium scrollbar-none w-full flex-shrink-0">
           <button
             onClick={() => setActiveTab('upload')}
             className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'upload' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -684,7 +684,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             : 'bg-slate-950/40 border-slate-800/60 opacity-70'
                           }`}
                       >
-                        <div className="space-y-1 flex-1">
+                        <div className="space-y-1.5 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${announcement.type === 'info' ? 'bg-blue-950 border border-blue-700 text-blue-300' :
                                 announcement.type === 'warning' ? 'bg-amber-950 border border-amber-700 text-amber-300' :
@@ -694,15 +694,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               {announcement.type}
                             </span>
 
-                            <h4 className="font-bold text-white text-sm">{announcement.title}</h4>
-
                             <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase ${announcement.isActive ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-800 text-slate-400 border border-slate-700'
                               }`}>
                               {announcement.isActive ? 'Active' : 'Inactive'}
                             </span>
                           </div>
 
-                          <p className="text-slate-300 text-xs leading-relaxed">{announcement.content}</p>
+                          <div className="text-xs leading-relaxed">
+                            <span className="font-bold text-white text-sm mr-1.5">{announcement.title}:</span>
+                            <span className="text-slate-300">{announcement.content}</span>
+                          </div>
 
                           <div className="flex items-center space-x-3 text-[10px] text-slate-500 font-mono pt-1">
                             <span>Created: {new Date(announcement.createdAt).toLocaleString()}</span>

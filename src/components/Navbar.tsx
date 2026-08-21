@@ -75,7 +75,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onReloadContent,
 }) => {
   const { isSignedIn } = useUser();
-  const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
   if (!isSignedIn) return null;
 
   const isDark = true;
@@ -254,69 +253,57 @@ export const Navbar: React.FC<NavbarProps> = ({
         }`}>
         {/* Left: Public Share & Filters */}
         <div className="flex items-center space-x-3">
-          <div className="relative">
-            <button
-              onClick={() => setIsShareDropdownOpen(!isShareDropdownOpen)}
-              className={`flex items-center space-x-1.5 text-xs font-medium border px-3 py-1.5 rounded-md transition-colors ${isDark ? 'text-slate-300 bg-slate-900/90 border-slate-800 hover:border-slate-700' : 'text-gray-600 bg-white border-gray-200 hover:border-gray-300'}`}
-            >
-              <Lock className="h-3 w-3 text-blue-400" />
-              <span>Public share</span>
-              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isShareDropdownOpen ? 'rotate-180' : ''} ${isDark ? 'text-slate-400' : 'text-gray-400'}`} />
-            </button>
-
-            {isShareDropdownOpen && (
-              <div
-                className={`absolute left-0 mt-1.5 z-[100] w-44 rounded-md border py-1 text-left text-xs shadow-2xl ${isDark ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-gray-700'}`}
-                onMouseLeave={() => setIsShareDropdownOpen(false)}
-              >
-                <button
-                  onClick={() => {
-                    setIsShareDropdownOpen(false);
-                    if (onReloadContent) {
-                      onReloadContent();
-                    } else {
-                      window.location.reload();
-                    }
-                  }}
-                  className={`w-full px-3 py-1.5 flex items-center space-x-2 transition-colors ${isDark ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-gray-100 text-gray-700'}`}
-                >
-                  <RefreshCw className="h-3.5 w-3.5 text-blue-400" />
-                  <span>Reload Content</span>
-                </button>
-              </div>
-            )}
+          {/* Public Share Custom Dropdown */}
+          <div className="w-44">
+            <CustomSelect
+              value="public_share"
+              onChange={(val) => {
+                if (val === 'reload') {
+                  if (onReloadContent) {
+                    onReloadContent();
+                  } else {
+                    window.location.reload();
+                  }
+                }
+              }}
+              options={[
+                { value: 'public_share', label: 'Public share', icon: <Lock className="h-3.5 w-3.5 text-blue-400" /> },
+                { value: 'reload', label: 'Reload Content', icon: <RefreshCw className="h-3.5 w-3.5 text-blue-400" /> },
+              ]}
+              buttonClassName="bg-slate-900/90 border-slate-800 hover:border-slate-700 text-slate-300"
+            />
           </div>
 
           {/* Type Filter Custom Dropdown */}
-          <div className="w-40 sm:w-44">
+          <div className="w-44">
             <CustomSelect
               value={typeFilter}
               onChange={setTypeFilter}
               options={[
-                { value: 'ALL', label: 'Type: All', icon: <Filter className="h-3 w-3 text-blue-400" /> },
-                { value: 'Folder', label: 'Folders', icon: <Folder className="h-3 w-3 text-amber-400" /> },
-                { value: 'Markdown document', label: 'Markdown', icon: <FileText className="h-3 w-3 text-blue-400" /> },
-                { value: 'PDF Document', label: 'PDF Documents', icon: <FileText className="h-3 w-3 text-red-400" /> },
-                { value: 'SVG Vector Image', label: 'Images', icon: <Grid className="h-3 w-3 text-emerald-400" /> },
-                { value: 'JSON Document', label: 'JSON / Configs', icon: <SlidersHorizontal className="h-3 w-3 text-cyan-400" /> },
-                { value: 'ZIP Archive', label: 'Archives', icon: <Download className="h-3 w-3 text-purple-400" /> },
+                { value: 'ALL', label: 'Type: All', icon: <Filter className="h-3.5 w-3.5 text-blue-400" /> },
+                { value: 'Folder', label: 'Folders', icon: <Folder className="h-3.5 w-3.5 text-amber-400" /> },
+                { value: 'Markdown document', label: 'Markdown', icon: <FileText className="h-3.5 w-3.5 text-blue-400" /> },
+                { value: 'PDF Document', label: 'PDF Documents', icon: <FileText className="h-3.5 w-3.5 text-red-400" /> },
+                { value: 'SVG Vector Image', label: 'Images', icon: <Grid className="h-3.5 w-3.5 text-emerald-400" /> },
+                { value: 'JSON Document', label: 'JSON / Configs', icon: <SlidersHorizontal className="h-3.5 w-3.5 text-cyan-400" /> },
+                { value: 'ZIP Archive', label: 'Archives', icon: <Download className="h-3.5 w-3.5 text-purple-400" /> },
               ]}
-              buttonClassName="py-1.5 px-3 bg-slate-900/90 border-slate-800 hover:border-slate-700 text-slate-300"
+              buttonClassName="bg-slate-900/90 border-slate-800 hover:border-slate-700 text-slate-300"
             />
           </div>
 
           {/* Modified Date Filter Custom Dropdown */}
-          <div className="w-44 sm:w-48">
+          <div className="w-44">
             <CustomSelect
               value={modifiedFilter}
               onChange={setModifiedFilter}
               options={[
-                { value: 'ALL', label: 'Modified: Any time', icon: <SlidersHorizontal className="h-3 w-3 text-blue-400" /> },
-                { value: 'today', label: 'Today', icon: <Sparkles className="h-3 w-3 text-amber-400" /> },
-                { value: 'yesterday', label: 'Yesterday', icon: <RefreshCw className="h-3 w-3 text-cyan-400" /> },
-                { value: 'last week', label: 'Last week', icon: <HelpCircle className="h-3 w-3 text-emerald-400" /> },
+                { value: 'ALL', label: 'Modified: Any time', icon: <SlidersHorizontal className="h-3.5 w-3.5 text-blue-400" /> },
+                { value: 'today', label: 'Today', icon: <Sparkles className="h-3.5 w-3.5 text-amber-400" /> },
+                { value: 'yesterday', label: 'Yesterday', icon: <RefreshCw className="h-3.5 w-3.5 text-cyan-400" /> },
+                { value: 'last week', label: 'Last week', icon: <HelpCircle className="h-3.5 w-3.5 text-emerald-400" /> },
               ]}
-              buttonClassName="py-1.5 px-3 bg-slate-900/90 border-slate-800 hover:border-slate-700 text-slate-300"
+              buttonClassName="bg-slate-900/90 border-slate-800 hover:border-slate-700 text-slate-300"
             />
           </div>
         </div>
