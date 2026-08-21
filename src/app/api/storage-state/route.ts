@@ -9,9 +9,10 @@ import {
   INITIAL_HERO_CHANGELOG,
   INITIAL_REPOSITORIES,
   INITIAL_USERS,
+  INITIAL_ANNOUNCEMENTS,
 } from '../../../lib/db';
 import { canEditRepository, canManagePlatform } from '../../../lib/authorization';
-import { VantorFile, VantorFolder, VantorRepository, VantorUser, ShareLink } from '../../../lib/types';
+import { VantorFile, VantorFolder, VantorRepository, VantorUser, ShareLink, Announcement } from '../../../lib/types';
 
 const STATE_ID = 'default';
 
@@ -23,6 +24,7 @@ const defaultState = {
   changelogs: {} as Record<string, any>,
   auditLogs: [] as any[],
   users: [] as VantorUser[],
+  announcements: INITIAL_ANNOUNCEMENTS as Announcement[],
   settings: {
     theme: 'dark',
   },
@@ -36,7 +38,7 @@ const getUserRole = (state: StorageState, userId: string) => {
 };
 
 const isSelfRegistrationPatch = (state: StorageState, patch: Partial<StorageState>, userId: string) => {
-  if (!patch.users || patch.files || patch.folders || patch.repositories || patch.changelog || patch.changelogs || patch.auditLogs) {
+  if (!patch.users || patch.files || patch.folders || patch.repositories || patch.changelog || patch.changelogs || patch.auditLogs || patch.announcements) {
     return false;
   }
 
@@ -154,8 +156,8 @@ const validatePatch = (state: StorageState, patch: Partial<StorageState>, userId
   const role = getUserRole(state, userId);
   const isAdmin = canManagePlatform(role);
 
-  if (!isAdmin && (patch.users || patch.changelog || patch.changelogs)) {
-    return 'Only administrators can manage users, permissions, and platform metadata.';
+  if (!isAdmin && (patch.users || patch.changelog || patch.changelogs || patch.announcements)) {
+    return 'Only administrators can manage users, permissions, announcements, and platform metadata.';
   }
 
   if (!isAdmin && patch.auditLogs) {

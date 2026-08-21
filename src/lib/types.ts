@@ -74,11 +74,26 @@ export interface VantorRepository {
   assignedRoles: UserRole[];
 }
 
+export type AnnouncementType = 'info' | 'warning' | 'alert' | 'success';
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  type: AnnouncementType;
+  isActive: boolean;
+  createdAt: string;
+  createdBy: string;
+  updatedAt?: string;
+  linkUrl?: string;
+  linkText?: string;
+}
+
 export interface AuditLog {
   id: string;
-  action: 'UPLOAD' | 'DELETE' | 'RENAME' | 'METADATA_UPDATE' | 'PERMISSION_CHANGE' | 'DOWNLOAD' | 'FOLDER_CREATE';
+  action: 'UPLOAD' | 'DELETE' | 'RENAME' | 'METADATA_UPDATE' | 'PERMISSION_CHANGE' | 'DOWNLOAD' | 'FOLDER_CREATE' | 'ANNOUNCEMENT_CREATE' | 'ANNOUNCEMENT_UPDATE' | 'ANNOUNCEMENT_DELETE';
   targetName: string;
-  targetType: 'file' | 'folder';
+  targetType: 'file' | 'folder' | 'announcement';
   performedBy: string;
   role: UserRole;
   timestamp: string;

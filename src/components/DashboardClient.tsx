@@ -10,11 +10,12 @@ import { HelpCircle, X, Mail, Activity, Upload, Trash2, Key, Folder } from 'luci
 import { HeroChangelog } from './HeroChangelog';
 import { FileBrowser } from './FileBrowser';
 import { FilePreviewModal } from './FilePreviewModal';
-import { AdminDashboard } from './AdminDashboard';
+import { AdminDashboard, AdminTab } from './AdminDashboard';
 import { AccessControlModal } from './AccessControlModal';
 import { FooterSummary } from './FooterSummary';
 import { Breadcrumbs } from './Breadcrumbs';
 import { ToastProvider, useToast } from './ToastProvider';
+import { AnnouncementBanner } from './AnnouncementBanner';
 import {
   ALL_USER_ROLES,
   canDeleteContent as userCanDeleteContent,
@@ -32,8 +33,9 @@ import {
   INITIAL_AUDIT_LOGS,
   INITIAL_REPOSITORIES,
   INITIAL_USERS,
+  INITIAL_ANNOUNCEMENTS,
 } from '../lib/db';
-import { VantorFile, VantorFolder, AuditLog, HeroChangelogData, UserRole, PermissionLevel, VantorRepository, VantorUser, Collaborator, ShareLink } from '../lib/types';
+import { VantorFile, VantorFolder, AuditLog, HeroChangelogData, UserRole, PermissionLevel, VantorRepository, VantorUser, Collaborator, ShareLink, Announcement } from '../lib/types';
 
 interface PersistedState {
   files: VantorFile[];
@@ -43,6 +45,7 @@ interface PersistedState {
   changelogs?: Record<string, HeroChangelogData>;
   auditLogs: AuditLog[];
   users: VantorUser[];
+  announcements?: Announcement[];
   shares?: ShareLink[];
   settings?: {
     theme?: 'dark' | 'light';
@@ -122,6 +125,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   const [changelogs, setChangelogs] = useState<Record<string, HeroChangelogData>>({});
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [managedUsers, setManagedUsers] = useState<VantorUser[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [shares, setShares] = useState<ShareLink[]>([]);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
@@ -191,6 +195,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         setChangelog(data.changelog || { title: '', subtitle: '', releases: [] });
         setChangelogs(data.changelogs || {});
         setAuditLogs(rawAuditLogs);
+        setAnnouncements(data.announcements || INITIAL_ANNOUNCEMENTS || []);
         setShares(data.shares || []);
 
         const loadedUsers = data.users || [];
@@ -343,7 +348,84 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   // Modal states
   const [previewFile, setPreviewFile] = useState<VantorFile | null>(null);
   const [isAdminDashboardOpen, setIsAdminDashboardOpen] = useState(false);
-  const [adminTabDefault, setAdminTabDefault] = useState<'upload' | 'folder' | 'files' | 'logs' | 'users'>('upload');
+  const [adminTabDefault, setAdminTabDefault] = useState<AdminTab>('upload');
+
+  // Announcement Handlers
+  const handleCreateAnnouncement = (newAnnouncement: Partial<Announcement>) => {
+    if (!canManagePlatform) return;
+    const created: Announcement = {
+      id: `announcement-${Date.now()}`,
+      title: newAnnouncement.title || 'Untitled Announcement',
+      content: newAnnouncement.content || '',
+      type: newAnnouncement.type || 'info',
+      isActive: newAnnouncement.isActive ?? true,
+      createdAt: new Date().toISOString(),
+      createdBy: displayName || 'Admin Operator',
+      linkUrl: newAnnouncement.linkUrl,
+      linkText: newAnnouncement.linkText,
+    };
+
+    const nextAnnouncements = [created, ...announcements];
+    const log: AuditLog = {
+      id: `log-${Date.now()}`,
+      action: 'ANNOUNCEMENT_CREATE',
+      targetName: created.title,
+      targetType: 'announcement',
+      performedBy: displayName,
+      role: effectiveRole,
+      timestamp: new Date().toISOString(),
+      details: `Published sitewide announcement "${created.title}" [${created.type.toUpperCase()}]`,
+    };
+
+    const nextLogs = [log, ...auditLogs];
+    setAnnouncements(nextAnnouncements);
+    setAuditLogs(nextLogs);
+    persistState({ announcements: nextAnnouncements, auditLogs: nextLogs }).catch((error) => setLoadError(error.message));
+  };
+
+  const handleUpdateAnnouncement = (id: string, updates: Partial<Announcement>) => {
+    if (!canManagePlatform) return;
+    const nextAnnouncements = announcements.map((a) => (a.id === id ? { ...a, ...updates, updatedAt: new Date().toISOString() } : a));
+    const target = announcements.find((a) => a.id === id);
+
+    const log: AuditLog = {
+      id: `log-${Date.now()}`,
+      action: 'ANNOUNCEMENT_UPDATE',
+      targetName: target?.title || id,
+      targetType: 'announcement',
+      performedBy: displayName,
+      role: effectiveRole,
+      timestamp: new Date().toISOString(),
+      details: `Updated announcement status/details for "${target?.title || id}"`,
+    };
+
+    const nextLogs = [log, ...auditLogs];
+    setAnnouncements(nextAnnouncements);
+    setAuditLogs(nextLogs);
+    persistState({ announcements: nextAnnouncements, auditLogs: nextLogs }).catch((error) => setLoadError(error.message));
+  };
+
+  const handleDeleteAnnouncement = (id: string) => {
+    if (!canManagePlatform) return;
+    const target = announcements.find((a) => a.id === id);
+    const nextAnnouncements = announcements.filter((a) => a.id !== id);
+
+    const log: AuditLog = {
+      id: `log-${Date.now()}`,
+      action: 'ANNOUNCEMENT_DELETE',
+      targetName: target?.title || id,
+      targetType: 'announcement',
+      performedBy: displayName,
+      role: effectiveRole,
+      timestamp: new Date().toISOString(),
+      details: `Deleted announcement "${target?.title || id}"`,
+    };
+
+    const nextLogs = [log, ...auditLogs];
+    setAnnouncements(nextAnnouncements);
+    setAuditLogs(nextLogs);
+    persistState({ announcements: nextAnnouncements, auditLogs: nextLogs }).catch((error) => setLoadError(error.message));
+  };
 
   // Access Control Permission Modal state
   const [permissionTarget, setPermissionTarget] = useState<{
@@ -1384,6 +1466,16 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
 
       {/* Main Content Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Sitewide Announcement Banner */}
+        <AnnouncementBanner
+          announcements={announcements}
+          isAdmin={canManagePlatform}
+          onOpenAdminDashboard={(tab) => {
+            setAdminTabDefault(tab);
+            setIsAdminDashboardOpen(true);
+          }}
+        />
+
         {/* Dynamic Welcome Greeting (Clean typography without container box) */}
         {showRepositoryIndex && (
           <div className="pt-2 pb-1">
@@ -1680,6 +1772,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         files={files}
         auditLogs={auditLogs}
         users={managedUsers}
+        announcements={announcements}
         currentUserId={user?.id || ''}
         onUploadFile={handleUploadFile}
         onCreateFolder={handleCreateFolder}
@@ -1693,6 +1786,9 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         onDeleteFolder={(id) => handleDeleteItem(id, true)}
         onUpdateUser={handleUpdateManagedUser}
         onDeleteUser={handleDeleteManagedUser}
+        onCreateAnnouncement={handleCreateAnnouncement}
+        onUpdateAnnouncement={handleUpdateAnnouncement}
+        onDeleteAnnouncement={handleDeleteAnnouncement}
         onClearAuditLogs={() => {
           if (!canManagePlatform) return;
           setAuditLogs([]);

@@ -16,12 +16,24 @@ import {
   Users,
   Lock,
   Unlock,
-  ShieldAlert
+  ShieldAlert,
+  Megaphone,
+  Plus,
+  Link as LinkIcon,
+  Sparkles,
+  CheckCircle,
+  AlertTriangle,
+  Info,
+  Eye,
+  EyeOff
 } from 'lucide-react';
-import { VantorFile, VantorFolder, AuditLog, PermissionLevel, UserRole, VantorUser } from '../lib/types';
+import { VantorFile, VantorFolder, AuditLog, PermissionLevel, UserRole, VantorUser, Announcement, AnnouncementType } from '../lib/types';
 import { ALL_USER_ROLES } from '../lib/authorization';
 import { useToast } from './ToastProvider';
 import { formatFriendlyDate, formatBytes } from '../lib/dateUtils';
+import { TOTAL_STORAGE_CAPACITY_BYTES, MAX_SINGLE_FILE_BYTES } from '../lib/db';
+
+export type AdminTab = 'upload' | 'folder' | 'announcements' | 'files' | 'logs' | 'users';
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -30,6 +42,7 @@ interface AdminDashboardProps {
   files: VantorFile[];
   auditLogs: AuditLog[];
   users: VantorUser[];
+  announcements?: Announcement[];
   currentUserId: string;
   onUploadFile: (newFile: Partial<VantorFile>) => void;
   onCreateFolder: (newFolder: Partial<VantorFolder>) => void;
@@ -38,8 +51,11 @@ interface AdminDashboardProps {
   onDeleteFolder: (folderId: string) => void;
   onUpdateUser: (userId: string, updates: Partial<VantorUser>) => void;
   onDeleteUser: (userId: string) => void;
+  onCreateAnnouncement?: (newAnnouncement: Partial<Announcement>) => void;
+  onUpdateAnnouncement?: (id: string, updates: Partial<Announcement>) => void;
+  onDeleteAnnouncement?: (id: string) => void;
   onClearAuditLogs?: () => void;
-  activeTabDefault?: 'upload' | 'folder' | 'files' | 'logs' | 'users';
+  activeTabDefault?: AdminTab;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -49,6 +65,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   files,
   auditLogs,
   users,
+  announcements = [],
   currentUserId,
   onUploadFile,
   onCreateFolder,
@@ -57,11 +74,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDeleteFolder,
   onUpdateUser,
   onDeleteUser,
+  onCreateAnnouncement,
+  onUpdateAnnouncement,
+  onDeleteAnnouncement,
   onClearAuditLogs,
   activeTabDefault = 'upload',
 }) => {
-  const [activeTab, setActiveTab] = useState<'upload' | 'folder' | 'files' | 'logs' | 'users'>(activeTabDefault);
-  const [adminLogFilter, setAdminLogFilter] = useState<'ALL' | 'PERMISSION_CHANGE' | 'UPLOAD' | 'DELETE'>('ALL');
+  const [activeTab, setActiveTab] = useState<AdminTab>(activeTabDefault);
+  const [adminLogFilter, setAdminLogFilter] = useState<'ALL' | 'PERMISSION_CHANGE' | 'UPLOAD' | 'DELETE' | 'ANNOUNCEMENT_CREATE'>('ALL');
+  const [announcementFilter, setAnnouncementFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const { addToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -88,6 +109,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [folderDescription, setFolderDescription] = useState('');
   const [folderPermission, setFolderPermission] = useState<PermissionLevel>('public');
 
+  // Form states for New Announcement
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementType, setAnnouncementType] = useState<AnnouncementType>('info');
+  const [announcementContent, setAnnouncementContent] = useState('');
+  const [announcementLinkUrl, setAnnouncementLinkUrl] = useState('');
+  const [announcementLinkText, setAnnouncementLinkText] = useState('');
+  const [announcementIsActive, setAnnouncementIsActive] = useState(true);
 
   if (!isOpen) return null;
 
@@ -141,9 +169,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return;
     }
 
-    // Enforce 2MB size limit to prevent breaking state payload limits
-    if (file.size > 2 * 1024 * 1024) {
-      addToast({ type: 'error', title: 'File too large', message: 'Maximum file size allowed is 2MB.' });
+    // Enforce 50MB size limit
+    if (file.size > MAX_SINGLE_FILE_BYTES) {
+      addToast({ type: 'error', title: 'File too large', message: 'Maximum file size allowed is 50MB.' });
       e.target.value = '';
       return;
     }
@@ -165,10 +193,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const setSuccessMsg = (msg: string) => {
-    addToast({ type: 'success', title: msg });
-  };
-
   const handleFolderSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!folderName.trim()) return;
@@ -185,10 +209,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setFolderDescription('');
   };
 
-  const calculateTotalSize = () => {
-    const bytes = files.reduce((acc, f) => acc + f.size, 0) + folders.reduce((acc, f) => acc + f.totalSize, 0);
-    return formatBytes(bytes);
+  const handleAnnouncementSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!announcementTitle.trim() || !announcementContent.trim()) {
+      addToast({ type: 'error', title: 'Missing fields', message: 'Please enter both title and content.' });
+      return;
+    }
+
+    if (onCreateAnnouncement) {
+      onCreateAnnouncement({
+        title: announcementTitle.trim(),
+        type: announcementType,
+        content: announcementContent.trim(),
+        linkUrl: announcementLinkUrl.trim() || undefined,
+        linkText: announcementLinkText.trim() || undefined,
+        isActive: announcementIsActive,
+        createdBy: 'System Admin',
+      });
+      addToast({ type: 'success', title: 'Announcement Published', message: 'Sitewide announcement has been published.' });
+    }
+
+    setAnnouncementTitle('');
+    setAnnouncementContent('');
+    setAnnouncementLinkUrl('');
+    setAnnouncementLinkText('');
+    setAnnouncementType('info');
+    setAnnouncementIsActive(true);
   };
+
+  const calculateTotalSizeBytes = () => {
+    return files.reduce((acc, f) => acc + f.size, 0) + folders.reduce((acc, f) => acc + f.totalSize, 0);
+  };
+
+  const calculateTotalSize = () => {
+    return formatBytes(calculateTotalSizeBytes());
+  };
+
+  const totalSizeBytes = calculateTotalSizeBytes();
+  const storageCapacityPercentage = Math.min(100, (totalSizeBytes / TOTAL_STORAGE_CAPACITY_BYTES) * 100);
+  const activeAnnouncementsCount = announcements.filter((a) => a.isActive).length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
@@ -201,7 +260,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
             <div>
               <h2 className="font-bold text-lg text-white">Vantor Admin Security Dashboard</h2>
-              <p className="text-xs text-slate-400">System Management, Metadata Control & User Permissions</p>
+              <p className="text-xs text-slate-400">System Management, Announcements & Storage Quotas</p>
             </div>
           </div>
 
@@ -210,52 +269,66 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </button>
         </div>
 
-        {/* Stats bar */}
-        <div className="grid grid-cols-4 gap-4 px-6 py-3 border-b border-slate-800/80 bg-[#060a17] text-xs">
-          <div className="flex items-center space-x-2">
-            <HardDrive className="h-4 w-4 text-blue-400" />
-            <div>
-              <span className="text-slate-400 block text-[10px] uppercase">Storage Used</span>
-              <span className="font-mono font-bold text-white text-xs">{calculateTotalSize()}</span>
+        {/* Stats & Storage Capacity Bar */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 px-6 py-3 border-b border-slate-800/80 bg-[#060a17] text-xs">
+          {/* Storage Capacity progress meter */}
+          <div className="md:col-span-2 flex flex-col justify-center space-y-1 bg-slate-900/40 p-2 rounded-lg border border-slate-800/60">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-1.5">
+                <HardDrive className="h-3.5 w-3.5 text-blue-400" />
+                <span className="text-slate-300 font-semibold text-[11px] uppercase tracking-wide">Storage Capacity</span>
+              </div>
+              <span className="font-mono font-bold text-white text-[11px]">
+                {calculateTotalSize()} / 50 GB
+              </span>
+            </div>
+            <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400 rounded-full transition-all duration-500"
+                style={{ width: `${Math.max(0.5, storageCapacityPercentage)}%` }}
+              />
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+
+          <div className="flex items-center space-x-2 bg-slate-900/40 p-2 rounded-lg border border-slate-800/60">
+            <Megaphone className="h-4 w-4 text-purple-400" />
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase">Announcements</span>
+              <span className="font-mono font-bold text-white text-xs">{activeAnnouncementsCount} active</span>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 bg-slate-900/40 p-2 rounded-lg border border-slate-800/60">
             <FileText className="h-4 w-4 text-emerald-400" />
             <div>
               <span className="text-slate-400 block text-[10px] uppercase">Total Files</span>
               <span className="font-mono font-bold text-white text-xs">{files.length} files</span>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Folder className="h-4 w-4 text-amber-400" />
+
+          <div className="flex items-center space-x-2 bg-slate-900/40 p-2 rounded-lg border border-slate-800/60">
+            <Users className="h-4 w-4 text-cyan-400" />
             <div>
-              <span className="text-slate-400 block text-[10px] uppercase">Folders</span>
-              <span className="font-mono font-bold text-white text-xs">{folders.length} folders</span>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Activity className="h-4 w-4 text-cyan-400" />
-            <div>
-              <span className="text-slate-400 block text-[10px] uppercase">Users</span>
-              <span className="font-mono font-bold text-white text-xs">{users.length} accounts</span>
+              <span className="text-slate-400 block text-[10px] uppercase">Accounts</span>
+              <span className="font-mono font-bold text-white text-xs">{users.length} users</span>
             </div>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center border-b border-slate-800 px-6 bg-[#080d1c] text-xs font-medium">
+        <div className="flex items-center overflow-x-auto border-b border-slate-800 px-6 bg-[#080d1c] text-xs font-medium scrollbar-none">
           <button
             onClick={() => setActiveTab('upload')}
-            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${activeTab === 'upload' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'upload' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
             <Upload className="h-3.5 w-3.5" />
-            <span>Upload New File</span>
+            <span>Upload File</span>
           </button>
 
           <button
             onClick={() => setActiveTab('folder')}
-            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${activeTab === 'folder' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'folder' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
             <FolderPlus className="h-3.5 w-3.5" />
@@ -263,34 +336,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('files')}
-            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${activeTab === 'files' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+            onClick={() => setActiveTab('announcements')}
+            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'announcements' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
-            <Sliders className="h-3.5 w-3.5" />
-            <span>Manage Existing Metadata</span>
+            <Megaphone className="h-3.5 w-3.5 text-purple-400" />
+            <span>Announcements</span>
+            {activeAnnouncementsCount > 0 && (
+              <span className="ml-1 rounded-full bg-purple-900/80 border border-purple-600 px-1.5 py-0.2 text-[10px] text-purple-300 font-mono">
+                {activeAnnouncementsCount}
+              </span>
+            )}
           </button>
 
           <button
-            onClick={() => setActiveTab('logs')}
-            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${activeTab === 'logs' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+            onClick={() => setActiveTab('files')}
+            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'files' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
-            <Clock className="h-3.5 w-3.5" />
-            <span>Audit Logs</span>
+            <Sliders className="h-3.5 w-3.5" />
+            <span>Manage Metadata</span>
           </button>
 
           <button
             onClick={() => setActiveTab('users')}
-            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 transition-colors ${activeTab === 'users' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'users' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
             <Users className="h-3.5 w-3.5" />
             <span>User Management</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'logs' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            <span>Audit Logs</span>
+          </button>
         </div>
-
-
 
         {/* Tab Content Body */}
         <div className="p-6 overflow-y-auto flex-1">
@@ -379,7 +464,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Select File (Max 2MB)</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-300 font-semibold">Select File (Max 50MB)</label>
+                  <span className="text-[10px] text-blue-400 font-mono">Upgraded Capacity: 50 GB Total Storage</span>
+                </div>
                 <div className="relative w-full bg-[#040813] border border-slate-800 rounded-lg p-2 flex items-center justify-center">
                   <input
                     ref={fileInputRef}
@@ -387,7 +475,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     onChange={handleFileSelect}
                     className="w-full text-xs text-slate-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-900/40 file:text-blue-300 hover:file:bg-blue-800/60 transition-colors"
                   />
-                  {isProcessingFile && <span className="absolute right-3 text-xs text-blue-400">Processing...</span>}
+                  {isProcessingFile && <span className="absolute right-3 text-xs text-blue-400">Processing file...</span>}
                 </div>
               </div>
 
@@ -454,7 +542,232 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </form>
           )}
 
-          {/* 3. MANAGE FILES & FOLDERS METADATA TAB */}
+          {/* 3. ANNOUNCEMENTS TAB */}
+          {activeTab === 'announcements' && (
+            <div className="space-y-6 text-xs font-sans">
+              {/* Announcement Creation Form */}
+              <div className="rounded-xl border border-purple-900/60 bg-purple-950/20 p-4 space-y-4">
+                <div className="flex items-center space-x-2 border-b border-purple-900/40 pb-3">
+                  <Megaphone className="h-4 w-4 text-purple-400" />
+                  <h3 className="font-bold text-sm text-white">Create Sitewide Announcement</h3>
+                  <span className="text-[10px] text-purple-300 bg-purple-900/50 px-2 py-0.5 rounded-full border border-purple-700">
+                    Visible to all platform users
+                  </span>
+                </div>
+
+                <form onSubmit={handleAnnouncementSubmit} className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="md:col-span-2">
+                      <label className="block text-slate-300 font-semibold mb-1">Announcement Title *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. 🚀 Scheduled Maintenance or System Upgrade"
+                        value={announcementTitle}
+                        onChange={(e) => setAnnouncementTitle(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Badge Type</label>
+                      <select
+                        value={announcementType}
+                        onChange={(e) => setAnnouncementType(e.target.value as AnnouncementType)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="info">Information (Blue)</option>
+                        <option value="warning">Warning (Amber)</option>
+                        <option value="alert">Alert (Rose)</option>
+                        <option value="success">Success (Emerald)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Announcement Message *</label>
+                    <textarea
+                      required
+                      rows={3}
+                      placeholder="Write your sitewide announcement message..."
+                      value={announcementContent}
+                      onChange={(e) => setAnnouncementContent(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Optional Action Link URL</label>
+                      <input
+                        type="url"
+                        placeholder="https://..."
+                        value={announcementLinkUrl}
+                        onChange={(e) => setAnnouncementLinkUrl(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Link Button Text</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Read Release Notes"
+                        value={announcementLinkText}
+                        onChange={(e) => setAnnouncementLinkText(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={announcementIsActive}
+                        onChange={(e) => setAnnouncementIsActive(e.target.checked)}
+                        className="rounded border-slate-800 bg-slate-900 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                      />
+                      <span className="text-slate-300 font-semibold">Publish immediately (Active)</span>
+                    </label>
+
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-lg transition-all flex items-center space-x-1.5"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Publish Announcement</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Announcements Inventory */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-slate-200 flex items-center space-x-2">
+                    <Megaphone className="h-4 w-4 text-purple-400" />
+                    <span>Sitewide Announcements ({announcements.length})</span>
+                  </h4>
+
+                  {/* Filter pills */}
+                  <div className="flex items-center space-x-1 text-[10px]">
+                    <button
+                      onClick={() => setAnnouncementFilter('ALL')}
+                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'ALL' ? 'bg-purple-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                    >
+                      All ({announcements.length})
+                    </button>
+                    <button
+                      onClick={() => setAnnouncementFilter('ACTIVE')}
+                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'ACTIVE' ? 'bg-purple-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                    >
+                      Active ({announcements.filter(a => a.isActive).length})
+                    </button>
+                    <button
+                      onClick={() => setAnnouncementFilter('INACTIVE')}
+                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'INACTIVE' ? 'bg-purple-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                    >
+                      Inactive ({announcements.filter(a => !a.isActive).length})
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {announcements
+                    .filter(a => announcementFilter === 'ALL' || (announcementFilter === 'ACTIVE' && a.isActive) || (announcementFilter === 'INACTIVE' && !a.isActive))
+                    .map((announcement) => (
+                      <div
+                        key={announcement.id}
+                        className={`p-4 rounded-xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 ${announcement.isActive
+                            ? 'bg-slate-900/80 border-slate-700/80 shadow-md'
+                            : 'bg-slate-950/40 border-slate-800/60 opacity-70'
+                          }`}
+                      >
+                        <div className="space-y-1 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${announcement.type === 'info' ? 'bg-blue-950 border border-blue-700 text-blue-300' :
+                                announcement.type === 'warning' ? 'bg-amber-950 border border-amber-700 text-amber-300' :
+                                  announcement.type === 'alert' ? 'bg-rose-950 border border-rose-700 text-rose-300' :
+                                    'bg-emerald-950 border border-emerald-700 text-emerald-300'
+                              }`}>
+                              {announcement.type}
+                            </span>
+
+                            <h4 className="font-bold text-white text-sm">{announcement.title}</h4>
+
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase ${announcement.isActive ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-800 text-slate-400 border border-slate-700'
+                              }`}>
+                              {announcement.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+
+                          <p className="text-slate-300 text-xs leading-relaxed">{announcement.content}</p>
+
+                          <div className="flex items-center space-x-3 text-[10px] text-slate-500 font-mono pt-1">
+                            <span>Created: {new Date(announcement.createdAt).toLocaleString()}</span>
+                            <span>•</span>
+                            <span>By: {announcement.createdBy}</span>
+                            {announcement.linkUrl && (
+                              <>
+                                <span>•</span>
+                                <a href={announcement.linkUrl} target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline flex items-center space-x-1">
+                                  <span>{announcement.linkText || 'Link'}</span>
+                                  <LinkIcon className="h-3 w-3 inline" />
+                                </a>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 flex-shrink-0 self-end md:self-center">
+                          {onUpdateAnnouncement && (
+                            <button
+                              onClick={() => {
+                                onUpdateAnnouncement(announcement.id, { isActive: !announcement.isActive });
+                                addToast({
+                                  type: 'info',
+                                  title: announcement.isActive ? 'Announcement Deactivated' : 'Announcement Activated',
+                                });
+                              }}
+                              className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${announcement.isActive
+                                  ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                                  : 'bg-emerald-950 border-emerald-700 text-emerald-200 hover:bg-emerald-900'
+                                }`}
+                            >
+                              {announcement.isActive ? <EyeOff className="h-3.5 w-3.5 text-amber-400" /> : <Eye className="h-3.5 w-3.5 text-emerald-400" />}
+                              <span>{announcement.isActive ? 'Deactivate' : 'Activate'}</span>
+                            </button>
+                          )}
+
+                          {onDeleteAnnouncement && (
+                            <button
+                              onClick={() => {
+                                onDeleteAnnouncement(announcement.id);
+                                addToast({ type: 'success', title: 'Announcement Deleted' });
+                              }}
+                              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border border-red-800 bg-red-950/60 text-red-300 hover:bg-red-900 hover:text-white transition-colors"
+                              title="Delete announcement"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                  {announcements.length === 0 && (
+                    <div className="text-center py-10 text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl bg-slate-950/20">
+                      No announcements created yet. Use the form above to publish your first sitewide announcement.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 4. MANAGE FILES & FOLDERS METADATA TAB */}
           {activeTab === 'files' && (
             <div className="space-y-6 text-xs">
               {/* Folders Inventory */}
@@ -532,7 +845,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           )}
 
-          {/* 4. USER MANAGEMENT TAB */}
+          {/* 5. USER MANAGEMENT TAB */}
           {activeTab === 'users' && (
             <div className="space-y-3 text-xs">
               <div className="rounded-lg border border-amber-800/70 bg-amber-950/40 px-4 py-3 text-amber-100">
@@ -615,7 +928,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           )}
 
-          {/* 5. AUDIT LOGS TAB */}
+          {/* 6. AUDIT LOGS TAB */}
           {activeTab === 'logs' && (
             <div className="space-y-4 text-xs font-sans">
               <div className="flex items-center justify-between">
@@ -646,6 +959,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'PERMISSION_CHANGE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
                 >
                   Security
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminLogFilter('ANNOUNCEMENT_CREATE')}
+                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'ANNOUNCEMENT_CREATE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                >
+                  Announcements
                 </button>
                 <button
                   type="button"
