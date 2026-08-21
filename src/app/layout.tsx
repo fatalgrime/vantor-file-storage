@@ -5,7 +5,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Vantor Storage',
-  description: 'Encrypted file storage and firmware management system for Vantor.',
+  description: 'Encrypted file management & sharing system.',
   icons: {
     icon: '/favicon.ico',
     shortcut: '/favicon.ico',

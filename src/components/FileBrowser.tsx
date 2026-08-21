@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Folder, 
@@ -25,6 +25,7 @@ import {
   FolderInput
 } from 'lucide-react';
 import { VantorFile, VantorFolder, UserRole } from '../lib/types';
+import { formatRelativeTime, parseDate } from '../lib/dateUtils';
 
 interface FileBrowserProps {
   folders: VantorFolder[];
@@ -87,6 +88,40 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       setSortOrder('asc');
     }
   };
+
+  const sortedFolders = useMemo(() => {
+    const copy = [...folders];
+    copy.sort((a, b) => {
+      let comp = 0;
+      if (sortField === 'name') comp = a.name.localeCompare(b.name);
+      else if (sortField === 'type') comp = 0;
+      else if (sortField === 'size') comp = a.totalSize - b.totalSize;
+      else if (sortField === 'modified') {
+        const timeA = parseDate(a.updatedAt)?.getTime() || parseDate(a.createdAt)?.getTime() || 0;
+        const timeB = parseDate(b.updatedAt)?.getTime() || parseDate(b.createdAt)?.getTime() || 0;
+        comp = timeA - timeB;
+      }
+      return sortOrder === 'asc' ? comp : -comp;
+    });
+    return copy;
+  }, [folders, sortField, sortOrder]);
+
+  const sortedFiles = useMemo(() => {
+    const copy = [...files];
+    copy.sort((a, b) => {
+      let comp = 0;
+      if (sortField === 'name') comp = a.name.localeCompare(b.name);
+      else if (sortField === 'type') comp = a.fileType.localeCompare(b.fileType);
+      else if (sortField === 'size') comp = a.size - b.size;
+      else if (sortField === 'modified') {
+        const timeA = parseDate(a.updatedAt)?.getTime() || parseDate(a.createdAt)?.getTime() || 0;
+        const timeB = parseDate(b.updatedAt)?.getTime() || parseDate(b.createdAt)?.getTime() || 0;
+        comp = timeA - timeB;
+      }
+      return sortOrder === 'asc' ? comp : -comp;
+    });
+    return copy;
+  }, [files, sortField, sortOrder]);
 
   const handleMenuToggle = (
     event: React.MouseEvent<HTMLButtonElement>,
@@ -299,7 +334,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             </thead>
             <tbody className="divide-y divide-[#1e3059]/40 text-slate-200">
               {/* Folder Rows */}
-              {folders.map((folder) => {
+              {sortedFolders.map((folder) => {
                 const isSelected = selectedIds.includes(folder.id);
                 return (
                   <tr
@@ -348,13 +383,13 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                     <td className="px-3 py-2 text-right text-slate-400 font-mono">{folder.formattedSize}</td>
 
                     {/* Modified */}
-                    <td className="px-3 py-2 text-right text-slate-400">{folder.updatedAt}</td>
+                    <td className="px-3 py-2 text-right text-slate-400">{formatRelativeTime(folder.updatedAt, folder.createdAt)}</td>
                   </tr>
                 );
               })}
 
               {/* File Rows */}
-              {files.map((file) => {
+              {sortedFiles.map((file) => {
                 const isSelected = selectedIds.includes(file.id);
                 return (
                   <tr
@@ -403,7 +438,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                     <td className="px-3 py-2 text-right text-slate-400 font-mono">{file.formattedSize}</td>
 
                     {/* Modified */}
-                    <td className="px-3 py-2 text-right text-slate-400">{file.updatedAt}</td>
+                    <td className="px-3 py-2 text-right text-slate-400">{formatRelativeTime(file.updatedAt, file.createdAt)}</td>
                   </tr>
                 );
               })}
@@ -421,7 +456,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       ) : (
         /* Grid View Mode */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {folders.map((folder) => {
+          {sortedFolders.map((folder) => {
             const isSelected = selectedIds.includes(folder.id);
             return (
               <div
@@ -459,7 +494,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             );
           })}
 
-          {files.map((file) => {
+          {sortedFiles.map((file) => {
             const isSelected = selectedIds.includes(file.id);
             return (
               <div
@@ -494,7 +529,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-800/80 text-[11px] text-slate-400">
-                  <span>Modified: {file.updatedAt}</span>
+                  <span>Modified: {formatRelativeTime(file.updatedAt, file.createdAt)}</span>
                   <button onClick={() => onDownloadFile(file)} className="text-blue-400 hover:underline flex items-center space-x-1">
                     <Download className="h-3 w-3" />
                     <span>Get</span>
