@@ -45,6 +45,7 @@ export type AdminTab = 'upload' | 'folder' | 'announcements' | 'files' | 'logs' 
 interface AdminDashboardProps {
   isOpen: boolean;
   onClose: () => void;
+  role?: UserRole;
   folders: VantorFolder[];
   files: VantorFile[];
   auditLogs: AuditLog[];
@@ -68,6 +69,7 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   isOpen,
   onClose,
+  role = 'admin',
   folders,
   files,
   auditLogs,
@@ -87,7 +89,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onClearAuditLogs,
   activeTabDefault = 'upload',
 }) => {
+  const isManager = role === 'manager';
   const [activeTab, setActiveTab] = useState<AdminTab>(activeTabDefault);
+  const [creationStatus, setCreationStatus] = useState<{ type: 'file' | 'folder'; name: string } | null>(null);
   const [adminLogFilter, setAdminLogFilter] = useState<'ALL' | 'PERMISSION_CHANGE' | 'UPLOAD' | 'DELETE' | 'ANNOUNCEMENT_CREATE'>('ALL');
   const [announcementFilter, setAnnouncementFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const { addToast } = useToast();
@@ -96,14 +100,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     if (isOpen) {
       setActiveTab(activeTabDefault);
+      setCreationStatus(null);
     }
   }, [activeTabDefault, isOpen]);
+
+  useEffect(() => {
+    if (isManager && (activeTab === 'files' || activeTab === 'users' || activeTab === 'logs')) {
+      setActiveTab('upload');
+    }
+  }, [isManager, activeTab]);
 
   // Form states for New File Upload
   const [fileName, setFileName] = useState('');
   const [fileCategory, setFileCategory] = useState('Documents & Assets');
   const [fileDescription, setFileDescription] = useState('');
-  const [fileTags, setFileTags] = useState('release, stable');
+  const [fileTags, setFileTags] = useState('');
   const [targetFolderId, setTargetFolderId] = useState<string>('root');
   const [filePermission, setFilePermission] = useState<PermissionLevel>('public');
   const [rawContent, setRawContent] = useState('');
@@ -135,10 +146,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
 
     const info = detectFileType(fileName.trim(), fileMime);
+    const createdName = fileName.trim();
 
     onUploadFile({
-      name: fileName.trim(),
-      originalName: fileName.trim(),
+      name: createdName,
+      originalName: createdName,
       fileType: info.fileType,
       category: fileCategory || info.category,
       extension: info.extension,
@@ -152,8 +164,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       permissionLevel: filePermission,
       allowedRoles: ALL_USER_ROLES,
       allowedUserIds: [],
-      uploadedBy: 'Admin (System Operator)',
-      uploadedByRole: 'admin',
+      uploadedBy: isManager ? 'Manager (Content Operator)' : 'Admin (System Operator)',
+      uploadedByRole: isManager ? 'manager' : 'admin',
     });
 
     setFileName('');
@@ -161,9 +173,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setRawContent('');
     setFileSize(0);
     setFileMime('application/octet-stream');
+    setFileTags('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+
+    setCreationStatus({ type: 'file', name: createdName });
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,8 +220,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     e.preventDefault();
     if (!folderName.trim()) return;
 
+    const createdFolderName = folderName.trim();
     onCreateFolder({
-      name: folderName.trim(),
+      name: createdFolderName,
       parentId: null,
       description: folderDescription || 'New folder directory',
       permissionLevel: folderPermission,
@@ -215,6 +231,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     setFolderName('');
     setFolderDescription('');
+
+    setCreationStatus({ type: 'folder', name: createdFolderName });
   };
 
   const handleAnnouncementSubmit = (e: React.FormEvent) => {
@@ -264,11 +282,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="flex items-center justify-between border-b border-[#1e3059] px-6 py-4 bg-[#090f22] flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-900/60 border border-blue-700/80 text-blue-400">
-              <ShieldCheck className="h-5 w-5" />
+              {isManager ? <Sparkles className="h-5 w-5 text-indigo-400" /> : <ShieldCheck className="h-5 w-5 text-blue-400" />}
             </div>
             <div>
-              <h2 className="font-bold text-lg text-white">Vantor Admin Security Dashboard</h2>
-              <p className="text-xs text-slate-400">System Management, Metadata Control & User Permissions</p>
+              <h2 className="font-bold text-lg text-white">
+                {isManager ? 'Vantor Manager Dashboard' : 'Vantor Admin Security Dashboard'}
+              </h2>
+              <p className="text-xs text-slate-400">
+                {isManager
+                  ? 'Content Management, Asset Uploads & Sitewide Announcements'
+                  : 'System Management, Metadata Control & User Permissions'}
+              </p>
             </div>
           </div>
 
@@ -326,7 +350,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* Tab Navigation */}
         <div className="flex items-center overflow-x-auto border-b border-slate-800 px-6 bg-[#080d1c] text-xs font-medium scrollbar-none w-full flex-shrink-0">
           <button
-            onClick={() => setActiveTab('upload')}
+            onClick={() => { setCreationStatus(null); setActiveTab('upload'); }}
             className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'upload' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
@@ -335,7 +359,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('folder')}
+            onClick={() => { setCreationStatus(null); setActiveTab('folder'); }}
             className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'folder' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
@@ -344,7 +368,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('announcements')}
+            onClick={() => { setCreationStatus(null); setActiveTab('announcements'); }}
             className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'announcements' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
@@ -358,666 +382,704 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             )}
           </button>
 
-          <button
-            onClick={() => setActiveTab('files')}
-            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'files' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-          >
-            <Sliders className={`h-3.5 w-3.5 ${activeTab === 'files' ? 'text-blue-400' : 'text-slate-400'}`} />
-            <span>Manage Metadata</span>
-          </button>
+          {!isManager && (
+            <button
+              onClick={() => { setCreationStatus(null); setActiveTab('files'); }}
+              className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'files' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+            >
+              <Sliders className={`h-3.5 w-3.5 ${activeTab === 'files' ? 'text-blue-400' : 'text-slate-400'}`} />
+              <span>Manage Metadata</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'users' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-          >
-            <Users className={`h-3.5 w-3.5 ${activeTab === 'users' ? 'text-blue-400' : 'text-slate-400'}`} />
-            <span>User Management</span>
-          </button>
+          {!isManager && (
+            <button
+              onClick={() => { setCreationStatus(null); setActiveTab('users'); }}
+              className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'users' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+            >
+              <Users className={`h-3.5 w-3.5 ${activeTab === 'users' ? 'text-blue-400' : 'text-slate-400'}`} />
+              <span>User Management</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('logs')}
-            className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'logs' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-          >
-            <Clock className={`h-3.5 w-3.5 ${activeTab === 'logs' ? 'text-blue-400' : 'text-slate-400'}`} />
-            <span>Audit Logs</span>
-          </button>
+          {!isManager && (
+            <button
+              onClick={() => { setCreationStatus(null); setActiveTab('logs'); }}
+              className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'logs' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+            >
+              <Clock className={`h-3.5 w-3.5 ${activeTab === 'logs' ? 'text-blue-400' : 'text-slate-400'}`} />
+              <span>Audit Logs</span>
+            </button>
+          )}
         </div>
 
         {/* Tab Content Body */}
         <div className="p-6 overflow-y-auto flex-1">
-          {/* 1. UPLOAD FILE TAB */}
-          {activeTab === 'upload' && (
-            <form onSubmit={handleUploadSubmit} className="space-y-4 text-xs font-sans">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">File Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Project_Document_v1.0.pdf or Readme.md"
-                    value={fileName}
-                    onChange={(e) => setFileName(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Category</label>
-                  <CustomSelect
-                    value={fileCategory}
-                    onChange={setFileCategory}
-                    options={[
-                      { value: 'Documents & Assets', label: 'Documents & Assets', icon: <FileText className="h-3.5 w-3.5 text-blue-400" /> },
-                      { value: 'Documentation', label: 'Documentation', icon: <BookOpen className="h-3.5 w-3.5 text-emerald-400" /> },
-                      { value: 'Brand Assets', label: 'Brand Assets', icon: <Sparkles className="h-3.5 w-3.5 text-amber-400" /> },
-                      { value: 'System Logs', label: 'System Logs', icon: <Activity className="h-3.5 w-3.5 text-cyan-400" /> },
-                      { value: 'Source Code', label: 'Source Code', icon: <Code className="h-3.5 w-3.5 text-purple-400" /> },
-                    ]}
-                  />
+          {creationStatus ? (
+            <div className="flex flex-col items-center justify-center py-16 px-6 text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
+              <div className="relative flex items-center justify-center">
+                <div className="absolute -inset-3 rounded-full bg-emerald-500/20 animate-ping opacity-75" style={{ animationDuration: '2.5s' }} />
+                <div className="h-20 w-20 rounded-full bg-emerald-950/80 border-2 border-emerald-500 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-900/30 relative">
+                  <CheckCircle className="h-10 w-10 text-emerald-400" />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Target Parent Folder</label>
-                  <CustomSelect
-                    value={targetFolderId}
-                    onChange={setTargetFolderId}
-                    options={[
-                      { value: 'root', label: 'Root Directory (Vantor Cloud Storage Repository)', icon: <HardDrive className="h-3.5 w-3.5 text-blue-400" /> },
-                      ...folders.map((f) => ({ value: f.id, label: f.name, icon: <Folder className="h-3.5 w-3.5 text-amber-400" /> })),
-                    ]}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Access Control Policy</label>
-                  <CustomSelect
-                    value={filePermission}
-                    onChange={(val: string) => setFilePermission(val as PermissionLevel)}
-                    options={[
-                      { value: 'public', label: 'Public (Anyone with link)', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
-                      { value: 'authenticated', label: 'Authenticated Users', icon: <UserCheck className="h-3.5 w-3.5 text-blue-400" /> },
-                      { value: 'role_restricted', label: 'Role Restricted (Specific Roles)', icon: <Shield className="h-3.5 w-3.5 text-amber-400" /> },
-                      { value: 'private', label: 'Admin Only', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
-                    ]}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Tags (Comma Separated)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. documents, assets, security, stable"
-                  value={fileTags}
-                  onChange={(e) => setFileTags(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Description</label>
-                <input
-                  type="text"
-                  placeholder="Brief summary of the file..."
-                  value={fileDescription}
-                  onChange={(e) => setFileDescription(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Select File (Max 50MB)</label>
-                <div className="relative w-full bg-[#040813] border border-slate-800 rounded-lg p-2 flex items-center justify-center">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    onChange={handleFileSelect}
-                    className="w-full text-xs text-slate-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-900/40 file:text-blue-300 hover:file:bg-blue-800/60 transition-colors"
-                  />
-                  {isProcessingFile && <span className="absolute right-3 text-xs text-blue-400">Processing file...</span>}
-                </div>
+              <div className="space-y-2 max-w-md">
+                <h3 className="text-xl font-bold text-white tracking-tight">
+                  {creationStatus.type === 'file' ? 'Creating file…' : 'Creating folder…'}
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                  A notification will appear in the bottom-right corner of your screen when your file or folder has finished uploading.
+                </p>
               </div>
 
               <div className="pt-2">
                 <button
-                  type="submit"
-                  className="w-full rounded-lg bg-blue-600 hover:bg-blue-500 py-2.5 text-xs font-bold text-white shadow-glow-blue transition-all flex items-center justify-center space-x-2"
+                  onClick={() => setCreationStatus(null)}
+                  className="px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white shadow-lg shadow-blue-600/30 transition-all flex items-center space-x-2"
                 >
-                  <Upload className="h-4 w-4" />
-                  <span>Upload File to Vantor Vault</span>
+                  <Sparkles className="h-4 w-4" />
+                  <span>{isManager ? 'Go to Manager Dashboard' : 'Go to Admin Dashboard'}</span>
                 </button>
               </div>
-            </form>
-          )}
-
-          {/* 2. CREATE FOLDER TAB */}
-          {activeTab === 'folder' && (
-            <form onSubmit={handleFolderSubmit} className="space-y-4 text-xs font-sans max-w-lg mx-auto py-4">
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Folder Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Enter a folder name (e.g. Design Assets, v2.0 Release)"
-                  value={folderName}
-                  onChange={(e) => setFolderName(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Folder Description</label>
-                <input
-                  type="text"
-                  placeholder="Purpose of this folder directory..."
-                  value={folderDescription}
-                  onChange={(e) => setFolderDescription(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Access Control Level</label>
-                <CustomSelect
-                  value={folderPermission}
-                  onChange={(val: string) => setFolderPermission(val as PermissionLevel)}
-                  options={[
-                    { value: 'public', label: 'Public (Anyone with link)', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
-                    { value: 'authenticated', label: 'Authenticated Users', icon: <UserCheck className="h-3.5 w-3.5 text-blue-400" /> },
-                    { value: 'role_restricted', label: 'Role Restricted', icon: <Shield className="h-3.5 w-3.5 text-amber-400" /> },
-                    { value: 'private', label: 'Admin Only', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
-                  ]}
-                />
-              </div>
-
-              <div className="pt-3">
-                <button
-                  type="submit"
-                  className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-lg transition-all flex items-center justify-center space-x-2"
-                >
-                  <FolderPlus className="h-4 w-4" />
-                  <span>Create Directory Folder</span>
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* 3. ANNOUNCEMENTS TAB */}
-          {activeTab === 'announcements' && (
-            <div className="space-y-4 text-xs font-sans">
-              {/* Announcement Creation Form */}
-              <div className="rounded-xl border border-[#1e3059] bg-[#090f22] p-4 space-y-3">
-                <div className="flex items-center space-x-2 border-b border-slate-800 pb-2.5">
-                  <Megaphone className="h-4 w-4 text-white" />
-                  <h3 className="font-bold text-sm text-white">Create Sitewide Announcement</h3>
-                </div>
-
-                <form onSubmit={handleAnnouncementSubmit} className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="md:col-span-2">
-                      <label className="block text-slate-300 font-semibold mb-1">Announcement Title *</label>
+            </div>
+          ) : (
+            <>
+              {/* 1. UPLOAD FILE TAB */}
+              {activeTab === 'upload' && (
+                <form onSubmit={handleUploadSubmit} className="space-y-4 text-xs font-sans">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">File Name *</label>
                       <input
                         type="text"
                         required
-                        placeholder="e.g. Scheduled Maintenance or Feature Release"
-                        value={announcementTitle}
-                        onChange={(e) => setAnnouncementTitle(e.target.value)}
+                        placeholder="e.g. Project_Document_v1.0.pdf or Readme.md"
+                        value={fileName}
+                        onChange={(e) => setFileName(e.target.value)}
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Badge Type</label>
+                      <label className="block text-slate-300 font-semibold mb-1">Category</label>
                       <CustomSelect
-                        value={announcementType}
-                        onChange={(val: string) => setAnnouncementType(val as AnnouncementType)}
+                        value={fileCategory}
+                        onChange={setFileCategory}
                         options={[
-                          { value: 'info', label: 'Information (Blue)', icon: <Info className="h-3.5 w-3.5 text-blue-400" /> },
-                          { value: 'warning', label: 'Warning (Amber)', icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-400" /> },
-                          { value: 'alert', label: 'Alert (Rose)', icon: <ShieldAlert className="h-3.5 w-3.5 text-rose-400" /> },
-                          { value: 'success', label: 'Success (Emerald)', icon: <CheckCircle className="h-3.5 w-3.5 text-emerald-400" /> },
+                          { value: 'Documents & Assets', label: 'Documents & Assets', icon: <FileText className="h-3.5 w-3.5 text-blue-400" /> },
+                          { value: 'Documentation', label: 'Documentation', icon: <BookOpen className="h-3.5 w-3.5 text-emerald-400" /> },
+                          { value: 'Brand Assets', label: 'Brand Assets', icon: <Sparkles className="h-3.5 w-3.5 text-amber-400" /> },
+                          { value: 'System Logs', label: 'System Logs', icon: <Activity className="h-3.5 w-3.5 text-cyan-400" /> },
+                          { value: 'Source Code', label: 'Source Code', icon: <Code className="h-3.5 w-3.5 text-purple-400" /> },
+                        ]}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Target Parent Folder</label>
+                      <CustomSelect
+                        value={targetFolderId}
+                        onChange={setTargetFolderId}
+                        options={[
+                          { value: 'root', label: 'Root Directory (Vantor Cloud Storage Repository)', icon: <HardDrive className="h-3.5 w-3.5 text-blue-400" /> },
+                          ...folders.map((f) => ({ value: f.id, label: f.name, icon: <Folder className="h-3.5 w-3.5 text-amber-400" /> })),
+                        ]}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Access Control Policy</label>
+                      <CustomSelect
+                        value={filePermission}
+                        onChange={(val: string) => setFilePermission(val as PermissionLevel)}
+                        options={[
+                          { value: 'public', label: 'Public (Anyone with link)', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
+                          { value: 'authenticated', label: 'Authenticated Users', icon: <UserCheck className="h-3.5 w-3.5 text-blue-400" /> },
+                          { value: 'role_restricted', label: 'Role Restricted (Specific Roles)', icon: <Shield className="h-3.5 w-3.5 text-amber-400" /> },
+                          { value: 'private', label: 'Admin Only', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
                         ]}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Announcement Message *</label>
-                    <textarea
-                      required
-                      rows={2.5 as any}
-                      placeholder="Write your sitewide announcement message..."
-                      value={announcementContent}
-                      onChange={(e) => setAnnouncementContent(e.target.value)}
+                    <label className="block text-slate-300 font-semibold mb-1">Tags (Comma Separated)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. documents, assets, security, stable"
+                      value={fileTags}
+                      onChange={(e) => setFileTags(e.target.value)}
                       className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Optional Action Link URL</label>
-                      <input
-                        type="url"
-                        placeholder="https://..."
-                        value={announcementLinkUrl}
-                        onChange={(e) => setAnnouncementLinkUrl(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Description</label>
+                    <input
+                      type="text"
+                      placeholder="Brief summary of the file..."
+                      value={fileDescription}
+                      onChange={(e) => setFileDescription(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="block text-slate-300 font-semibold mb-1">Link Button Text</label>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Select File (Max 50MB)</label>
+                    <div className="relative w-full bg-[#040813] border border-slate-800 rounded-lg p-2 flex items-center justify-center">
                       <input
-                        type="text"
-                        placeholder="e.g. Read Release Notes"
-                        value={announcementLinkText}
-                        onChange={(e) => setAnnouncementLinkText(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                        ref={fileInputRef}
+                        type="file"
+                        onChange={handleFileSelect}
+                        className="w-full text-xs text-slate-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-900/40 file:text-blue-300 hover:file:bg-blue-800/60 transition-colors"
                       />
+                      {isProcessingFile && <span className="absolute right-3 text-xs text-blue-400">Processing file...</span>}
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-1">
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={announcementIsActive}
-                        onChange={(e) => setAnnouncementIsActive(e.target.checked)}
-                        className="rounded border-slate-800 bg-slate-900 text-blue-600 focus:ring-blue-500 h-4 w-4"
-                      />
-                      <span className="text-slate-300 font-semibold">Publish immediately (Active)</span>
-                    </label>
-
+                  <div className="pt-2">
                     <button
                       type="submit"
-                      className="rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-bold text-white shadow-md transition-all flex items-center space-x-1.5"
+                      className="w-full rounded-lg bg-blue-600 hover:bg-blue-500 py-2.5 text-xs font-bold text-white shadow-glow-blue transition-all flex items-center justify-center space-x-2"
                     >
-                      <Plus className="h-4 w-4" />
-                      <span>Publish Announcement</span>
+                      <Upload className="h-4 w-4" />
+                      <span>Upload File to Vantor Vault</span>
                     </button>
                   </div>
                 </form>
-              </div>
+              )}
 
-              {/* Announcements Inventory */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-slate-200 flex items-center space-x-2">
-                    <Megaphone className="h-4 w-4 text-white" />
-                    <span>Sitewide Announcements ({announcements.length})</span>
-                  </h4>
+              {/* 2. CREATE FOLDER TAB */}
+              {activeTab === 'folder' && (
+                <form onSubmit={handleFolderSubmit} className="space-y-4 text-xs font-sans max-w-lg mx-auto py-4">
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Folder Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter a folder name (e.g. Design Assets, v2.0 Release)"
+                      value={folderName}
+                      onChange={(e) => setFolderName(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Folder Description</label>
+                    <input
+                      type="text"
+                      placeholder="Purpose of this folder directory..."
+                      value={folderDescription}
+                      onChange={(e) => setFolderDescription(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Access Control Level</label>
+                    <CustomSelect
+                      value={folderPermission}
+                      onChange={(val: string) => setFolderPermission(val as PermissionLevel)}
+                      options={[
+                        { value: 'public', label: 'Public (Anyone with link)', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
+                        { value: 'authenticated', label: 'Authenticated Users', icon: <UserCheck className="h-3.5 w-3.5 text-blue-400" /> },
+                        { value: 'role_restricted', label: 'Role Restricted', icon: <Shield className="h-3.5 w-3.5 text-amber-400" /> },
+                        { value: 'private', label: 'Admin Only', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
+                      ]}
+                    />
+                  </div>
+
+                  <div className="pt-3">
+                    <button
+                      type="submit"
+                      className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-lg transition-all flex items-center justify-center space-x-2"
+                    >
+                      <FolderPlus className="h-4 w-4" />
+                      <span>Create Directory Folder</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* 3. ANNOUNCEMENTS TAB */}
+              {activeTab === 'announcements' && (
+                <div className="space-y-4 text-xs font-sans">
+                  {/* Announcement Creation Form */}
+                  <div className="rounded-xl border border-[#1e3059] bg-[#090f22] p-4 space-y-3">
+                    <div className="flex items-center space-x-2 border-b border-slate-800 pb-2.5">
+                      <Megaphone className="h-4 w-4 text-white" />
+                      <h3 className="font-bold text-sm text-white">Create Sitewide Announcement</h3>
+                    </div>
+
+                    <form onSubmit={handleAnnouncementSubmit} className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="md:col-span-2">
+                          <label className="block text-slate-300 font-semibold mb-1">Announcement Title *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Scheduled Maintenance or Feature Release"
+                            value={announcementTitle}
+                            onChange={(e) => setAnnouncementTitle(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">Badge Type</label>
+                          <CustomSelect
+                            value={announcementType}
+                            onChange={(val: string) => setAnnouncementType(val as AnnouncementType)}
+                            options={[
+                              { value: 'info', label: 'Information (Blue)', icon: <Info className="h-3.5 w-3.5 text-blue-400" /> },
+                              { value: 'warning', label: 'Warning (Amber)', icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-400" /> },
+                              { value: 'alert', label: 'Alert (Rose)', icon: <ShieldAlert className="h-3.5 w-3.5 text-rose-400" /> },
+                              { value: 'success', label: 'Success (Emerald)', icon: <CheckCircle className="h-3.5 w-3.5 text-emerald-400" /> },
+                            ]}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-semibold mb-1">Announcement Message *</label>
+                        <textarea
+                          required
+                          rows={2.5 as any}
+                          placeholder="Write your sitewide announcement message..."
+                          value={announcementContent}
+                          onChange={(e) => setAnnouncementContent(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">Optional Action Link URL</label>
+                          <input
+                            type="url"
+                            placeholder="https://..."
+                            value={announcementLinkUrl}
+                            onChange={(e) => setAnnouncementLinkUrl(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">Link Button Text</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Read Release Notes"
+                            value={announcementLinkText}
+                            onChange={(e) => setAnnouncementLinkText(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={announcementIsActive}
+                            onChange={(e) => setAnnouncementIsActive(e.target.checked)}
+                            className="rounded border-slate-800 bg-slate-900 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                          />
+                          <span className="text-slate-300 font-semibold">Publish immediately (Active)</span>
+                        </label>
+
+                        <button
+                          type="submit"
+                          className="rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-bold text-white shadow-md transition-all flex items-center space-x-1.5"
+                        >
+                          <Plus className="h-4 w-4" />
+                          <span>Publish Announcement</span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Announcements Inventory */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-slate-200 flex items-center space-x-2">
+                        <Megaphone className="h-4 w-4 text-white" />
+                        <span>Sitewide Announcements ({announcements.length})</span>
+                      </h4>
+
+                      {/* Filter pills */}
+                      <div className="flex items-center space-x-1 text-[10px]">
+                        <button
+                          onClick={() => setAnnouncementFilter('ALL')}
+                          className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'ALL' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                        >
+                          All ({announcements.length})
+                        </button>
+                        <button
+                          onClick={() => setAnnouncementFilter('ACTIVE')}
+                          className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'ACTIVE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                        >
+                          Active ({announcements.filter(a => a.isActive).length})
+                        </button>
+                        <button
+                          onClick={() => setAnnouncementFilter('INACTIVE')}
+                          className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'INACTIVE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                        >
+                          Inactive ({announcements.filter(a => !a.isActive).length})
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {announcements
+                        .filter(a => announcementFilter === 'ALL' || (announcementFilter === 'ACTIVE' && a.isActive) || (announcementFilter === 'INACTIVE' && !a.isActive))
+                        .map((announcement) => (
+                          <div
+                            key={announcement.id}
+                            className={`p-4 rounded-xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 ${announcement.isActive
+                              ? 'bg-slate-900/80 border-slate-700/80 shadow-md'
+                              : 'bg-slate-950/40 border-slate-800/60 opacity-70'
+                              }`}
+                          >
+                            <div className="space-y-1.5 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${announcement.type === 'info' ? 'bg-blue-950 border border-blue-700 text-blue-300' :
+                                  announcement.type === 'warning' ? 'bg-amber-950 border border-amber-700 text-amber-300' :
+                                    announcement.type === 'alert' ? 'bg-rose-950 border border-rose-700 text-rose-300' :
+                                      'bg-emerald-950 border border-emerald-700 text-emerald-300'
+                                  }`}>
+                                  {announcement.type}
+                                </span>
+
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase ${announcement.isActive ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-800 text-slate-400 border border-slate-700'
+                                  }`}>
+                                  {announcement.isActive ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+
+                              <div className="text-xs leading-relaxed">
+                                <span className="font-bold text-white text-sm mr-1.5">{announcement.title}:</span>
+                                <span className="text-slate-300">{announcement.content}</span>
+                              </div>
+
+                              <div className="flex items-center space-x-3 text-[10px] text-slate-500 font-mono pt-1">
+                                <span>Created: {new Date(announcement.createdAt).toLocaleString()}</span>
+                                <span>•</span>
+                                <span>By: {announcement.createdBy}</span>
+                                {announcement.linkUrl && (
+                                  <>
+                                    <span>•</span>
+                                    <a href={announcement.linkUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline flex items-center space-x-1">
+                                      <span>{announcement.linkText || 'Link'}</span>
+                                      <LinkIcon className="h-3 w-3 inline" />
+                                    </a>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-2 flex-shrink-0 self-end md:self-center">
+                              {onUpdateAnnouncement && (
+                                <button
+                                  onClick={() => {
+                                    onUpdateAnnouncement(announcement.id, { isActive: !announcement.isActive });
+                                    addToast({
+                                      type: 'info',
+                                      title: announcement.isActive ? 'Announcement Deactivated' : 'Announcement Activated',
+                                    });
+                                  }}
+                                  className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${announcement.isActive
+                                    ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                                    : 'bg-emerald-950 border-emerald-700 text-emerald-200 hover:bg-emerald-900'
+                                    }`}
+                                >
+                                  {announcement.isActive ? <EyeOff className="h-3.5 w-3.5 text-amber-400" /> : <Eye className="h-3.5 w-3.5 text-emerald-400" />}
+                                  <span>{announcement.isActive ? 'Deactivate' : 'Activate'}</span>
+                                </button>
+                              )}
+
+                              {onDeleteAnnouncement && (
+                                <button
+                                  onClick={() => {
+                                    onDeleteAnnouncement(announcement.id);
+                                    addToast({ type: 'success', title: 'Announcement Deleted' });
+                                  }}
+                                  className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border border-red-800 bg-red-950/60 text-red-300 hover:bg-red-900 hover:text-white transition-colors"
+                                  title="Delete announcement"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <span>Delete</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+
+                      {announcements.length === 0 && (
+                        <div className="text-center py-10 text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl bg-slate-950/20">
+                          No announcements created yet. Use the form above to publish your first sitewide announcement.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 4. MANAGE FILES & FOLDERS METADATA TAB */}
+              {activeTab === 'files' && (
+                <div className="space-y-6 text-xs">
+                  {/* Folders Inventory */}
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-slate-200 flex items-center space-x-2">
+                      <Folder className="h-4 w-4 text-amber-400" />
+                      <span>Folder Directories ({folders.length})</span>
+                    </h4>
+                    <div className="divide-y divide-slate-800 border border-slate-800 rounded-lg bg-slate-950/40">
+                      {folders.map((folder) => (
+                        <div key={folder.id} className="p-3 flex items-center justify-between hover:bg-slate-900/60 transition-colors">
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-bold text-white">{folder.name}</span>
+                              <span className="text-[10px] text-slate-400 font-mono">({folder.itemCount} items · {folder.formattedSize})</span>
+                              <span className="bg-amber-950 border border-amber-800 text-amber-300 px-1.5 py-0.5 rounded text-[10px] uppercase font-mono">
+                                {folder.permissionLevel}
+                              </span>
+                            </div>
+                            <p className="text-slate-400 text-[11px]">{folder.description}</p>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => onDeleteFolder(folder.id)}
+                              className="rounded p-1.5 text-red-400 hover:bg-red-950/50 hover:text-red-300 transition-colors flex items-center space-x-1"
+                              title="Delete folder and contents"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span className="text-[11px]">Delete</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {folders.length === 0 && (
+                        <div className="p-3 text-slate-500 text-center">No folders found.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Files Inventory */}
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-slate-200 flex items-center space-x-2">
+                      <FileText className="h-4 w-4 text-blue-400" />
+                      <span>File Assets ({files.length})</span>
+                    </h4>
+                    <div className="divide-y divide-slate-800 border border-slate-800 rounded-lg bg-slate-950/40">
+                      {files.map((file) => (
+                        <div key={file.id} className="p-3 flex items-center justify-between hover:bg-slate-900/60 transition-colors">
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-bold text-white">{file.name}</span>
+                              <span className="text-[10px] text-slate-400 font-mono">({file.formattedSize})</span>
+                              <span className="bg-blue-950 border border-blue-800 text-blue-300 px-1.5 py-0.5 rounded text-[10px] uppercase font-mono">
+                                {file.permissionLevel}
+                              </span>
+                            </div>
+                            <p className="text-slate-400 text-[11px]">{file.description}</p>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => onDeleteFile(file.id)}
+                              className="rounded p-1.5 text-red-400 hover:bg-red-950/50 hover:text-red-300 transition-colors flex items-center space-x-1"
+                              title="Delete file"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span className="text-[11px]">Delete</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 5. USER MANAGEMENT TAB */}
+              {activeTab === 'users' && (
+                <div className="space-y-3 text-xs">
+                  <div className="rounded-lg border border-amber-800/70 bg-amber-950/40 px-4 py-3 text-amber-100">
+                    <div className="flex items-start space-x-2">
+                      <ShieldAlert className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-300" />
+                      <p>
+                        Self-protection is enforced: current administrators cannot delete their own account, lock themselves, or remove their own admin role.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/40">
+                    <table className="w-full text-left">
+                      <thead className="border-b border-slate-800 bg-[#080d1c] text-[11px] uppercase text-slate-400">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">User</th>
+                          <th className="px-3 py-2 font-semibold">Role</th>
+                          <th className="px-3 py-2 font-semibold">Status</th>
+                          <th className="px-3 py-2 font-semibold">Last active</th>
+                          <th className="px-3 py-2 text-right font-semibold">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {users.map((managedUser) => {
+                          const isSelf = managedUser.id === currentUserId;
+
+                          return (
+                            <tr key={managedUser.id} className="hover:bg-slate-900/60">
+                              <td className="px-3 py-3">
+                                <div className="font-semibold text-white">{managedUser.name}</div>
+                                <div className="text-[11px] text-slate-400">{managedUser.email}</div>
+                              </td>
+                              <td className="px-3 py-3">
+                                <CustomSelect
+                                  value={managedUser.role}
+                                  disabled={isSelf}
+                                  onChange={(val: string) => onUpdateUser(managedUser.id, { role: val as UserRole })}
+                                  options={[
+                                    { value: 'admin', label: 'Administrator', icon: <ShieldCheck className="h-3 w-3 text-blue-400" /> },
+                                    { value: 'manager', label: 'Manager', icon: <UserCheck className="h-3 w-3 text-indigo-400" /> },
+                                    { value: 'member', label: 'Member', icon: <Users className="h-3 w-3 text-emerald-400" /> },
+                                    { value: 'viewer', label: 'Viewer', icon: <Eye className="h-3 w-3 text-slate-400" /> },
+                                  ]}
+                                  className="w-28"
+                                  buttonClassName="py-1 px-2 text-xs"
+                                />
+                              </td>
+                              <td className="px-3 py-3">
+                                <span className={`rounded px-2 py-1 text-[10px] font-semibold uppercase ${managedUser.locked
+                                  ? 'bg-red-950 text-red-300 border border-red-800'
+                                  : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                  }`}>
+                                  {managedUser.locked ? 'Locked' : 'Active'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 font-mono text-[11px] text-slate-400">{formatFriendlyDate(managedUser.lastActive)}</td>
+                              <td className="px-3 py-3">
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    onClick={() => onUpdateUser(managedUser.id, { locked: !managedUser.locked })}
+                                    disabled={isSelf}
+                                    className="inline-flex items-center space-x-1 rounded border border-slate-700 bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {managedUser.locked ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                                    <span>{managedUser.locked ? 'Unlock' : 'Lock'}</span>
+                                  </button>
+                                  <button
+                                    onClick={() => onDeleteUser(managedUser.id)}
+                                    disabled={isSelf}
+                                    className="inline-flex items-center space-x-1 rounded border border-red-800 bg-red-950/70 px-2.5 py-1 text-[11px] font-semibold text-red-200 hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <span>Delete</span>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* 6. AUDIT LOGS TAB */}
+              {activeTab === 'logs' && (
+                <div className="space-y-4 text-xs font-sans">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-slate-200">Audit Trail History ({auditLogs.filter(log => adminLogFilter === 'ALL' || log.action === adminLogFilter).length})</h4>
+                    {onClearAuditLogs && auditLogs.length > 0 && (
+                      <button
+                        onClick={onClearAuditLogs}
+                        className="flex items-center space-x-1 rounded bg-red-950/80 border border-red-800/80 px-2.5 py-1 text-red-300 hover:bg-red-900 hover:text-white transition-colors text-[11px]"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Clear Audit History</span>
+                      </button>
+                    )}
+                  </div>
 
                   {/* Filter pills */}
-                  <div className="flex items-center space-x-1 text-[10px]">
+                  <div className="flex flex-wrap gap-1 text-[10px]">
                     <button
-                      onClick={() => setAnnouncementFilter('ALL')}
-                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'ALL' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                      type="button"
+                      onClick={() => setAdminLogFilter('ALL')}
+                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'ALL' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
                     >
-                      All ({announcements.length})
+                      All
                     </button>
                     <button
-                      onClick={() => setAnnouncementFilter('ACTIVE')}
-                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'ACTIVE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                      type="button"
+                      onClick={() => setAdminLogFilter('PERMISSION_CHANGE')}
+                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'PERMISSION_CHANGE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
                     >
-                      Active ({announcements.filter(a => a.isActive).length})
+                      Security
                     </button>
                     <button
-                      onClick={() => setAnnouncementFilter('INACTIVE')}
-                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'INACTIVE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                      type="button"
+                      onClick={() => setAdminLogFilter('ANNOUNCEMENT_CREATE')}
+                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'ANNOUNCEMENT_CREATE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
                     >
-                      Inactive ({announcements.filter(a => !a.isActive).length})
+                      Announcements
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAdminLogFilter('UPLOAD')}
+                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'UPLOAD' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                    >
+                      Uploads
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAdminLogFilter('DELETE')}
+                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'DELETE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                    >
+                      Deletes
                     </button>
                   </div>
-                </div>
 
-                <div className="space-y-3">
-                  {announcements
-                    .filter(a => announcementFilter === 'ALL' || (announcementFilter === 'ACTIVE' && a.isActive) || (announcementFilter === 'INACTIVE' && !a.isActive))
-                    .map((announcement) => (
-                      <div
-                        key={announcement.id}
-                        className={`p-4 rounded-xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 ${announcement.isActive
-                          ? 'bg-slate-900/80 border-slate-700/80 shadow-md'
-                          : 'bg-slate-950/40 border-slate-800/60 opacity-70'
-                          }`}
-                      >
-                        <div className="space-y-1.5 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${announcement.type === 'info' ? 'bg-blue-950 border border-blue-700 text-blue-300' :
-                              announcement.type === 'warning' ? 'bg-amber-950 border border-amber-700 text-amber-300' :
-                                announcement.type === 'alert' ? 'bg-rose-950 border border-rose-700 text-rose-300' :
-                                  'bg-emerald-950 border border-emerald-700 text-emerald-300'
-                              }`}>
-                              {announcement.type}
-                            </span>
-
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase ${announcement.isActive ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-800 text-slate-400 border border-slate-700'
-                              }`}>
-                              {announcement.isActive ? 'Active' : 'Inactive'}
-                            </span>
+                  <div className="space-y-2">
+                    {auditLogs
+                      .filter(log => adminLogFilter === 'ALL' || log.action === adminLogFilter)
+                      .map((log) => (
+                        <div key={log.id} className="flex items-start space-x-3 p-3 rounded-lg bg-slate-900/60 border border-slate-800">
+                          <div className="flex h-7 w-7 items-center justify-center rounded bg-slate-800 text-blue-400 font-mono text-[10px] font-bold flex-shrink-0">
+                            {log.action.substring(0, 3)}
                           </div>
-
-                          <div className="text-xs leading-relaxed">
-                            <span className="font-bold text-white text-sm mr-1.5">{announcement.title}:</span>
-                            <span className="text-slate-300">{announcement.content}</span>
-                          </div>
-
-                          <div className="flex items-center space-x-3 text-[10px] text-slate-500 font-mono pt-1">
-                            <span>Created: {new Date(announcement.createdAt).toLocaleString()}</span>
-                            <span>•</span>
-                            <span>By: {announcement.createdBy}</span>
-                            {announcement.linkUrl && (
-                              <>
-                                <span>•</span>
-                                <a href={announcement.linkUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline flex items-center space-x-1">
-                                  <span>{announcement.linkText || 'Link'}</span>
-                                  <LinkIcon className="h-3 w-3 inline" />
-                                </a>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center space-x-2 flex-shrink-0 self-end md:self-center">
-                          {onUpdateAnnouncement && (
-                            <button
-                              onClick={() => {
-                                onUpdateAnnouncement(announcement.id, { isActive: !announcement.isActive });
-                                addToast({
-                                  type: 'info',
-                                  title: announcement.isActive ? 'Announcement Deactivated' : 'Announcement Activated',
-                                });
-                              }}
-                              className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${announcement.isActive
-                                ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-                                : 'bg-emerald-950 border-emerald-700 text-emerald-200 hover:bg-emerald-900'
-                                }`}
-                            >
-                              {announcement.isActive ? <EyeOff className="h-3.5 w-3.5 text-amber-400" /> : <Eye className="h-3.5 w-3.5 text-emerald-400" />}
-                              <span>{announcement.isActive ? 'Deactivate' : 'Activate'}</span>
-                            </button>
-                          )}
-
-                          {onDeleteAnnouncement && (
-                            <button
-                              onClick={() => {
-                                onDeleteAnnouncement(announcement.id);
-                                addToast({ type: 'success', title: 'Announcement Deleted' });
-                              }}
-                              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border border-red-800 bg-red-950/60 text-red-300 hover:bg-red-900 hover:text-white transition-colors"
-                              title="Delete announcement"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              <span>Delete</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-
-                  {announcements.length === 0 && (
-                    <div className="text-center py-10 text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl bg-slate-950/20">
-                      No announcements created yet. Use the form above to publish your first sitewide announcement.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 4. MANAGE FILES & FOLDERS METADATA TAB */}
-          {activeTab === 'files' && (
-            <div className="space-y-6 text-xs">
-              {/* Folders Inventory */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-slate-200 flex items-center space-x-2">
-                  <Folder className="h-4 w-4 text-amber-400" />
-                  <span>Folder Directories ({folders.length})</span>
-                </h4>
-                <div className="divide-y divide-slate-800 border border-slate-800 rounded-lg bg-slate-950/40">
-                  {folders.map((folder) => (
-                    <div key={folder.id} className="p-3 flex items-center justify-between hover:bg-slate-900/60 transition-colors">
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2">
-                          <span className="font-bold text-white">{folder.name}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">({folder.itemCount} items · {folder.formattedSize})</span>
-                          <span className="bg-amber-950 border border-amber-800 text-amber-300 px-1.5 py-0.5 rounded text-[10px] uppercase font-mono">
-                            {folder.permissionLevel}
-                          </span>
-                        </div>
-                        <p className="text-slate-400 text-[11px]">{folder.description}</p>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => onDeleteFolder(folder.id)}
-                          className="rounded p-1.5 text-red-400 hover:bg-red-950/50 hover:text-red-300 transition-colors flex items-center space-x-1"
-                          title="Delete folder and contents"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="text-[11px]">Delete</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  {folders.length === 0 && (
-                    <div className="p-3 text-slate-500 text-center">No folders found.</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Files Inventory */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-slate-200 flex items-center space-x-2">
-                  <FileText className="h-4 w-4 text-blue-400" />
-                  <span>File Assets ({files.length})</span>
-                </h4>
-                <div className="divide-y divide-slate-800 border border-slate-800 rounded-lg bg-slate-950/40">
-                  {files.map((file) => (
-                    <div key={file.id} className="p-3 flex items-center justify-between hover:bg-slate-900/60 transition-colors">
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2">
-                          <span className="font-bold text-white">{file.name}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">({file.formattedSize})</span>
-                          <span className="bg-blue-950 border border-blue-800 text-blue-300 px-1.5 py-0.5 rounded text-[10px] uppercase font-mono">
-                            {file.permissionLevel}
-                          </span>
-                        </div>
-                        <p className="text-slate-400 text-[11px]">{file.description}</p>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => onDeleteFile(file.id)}
-                          className="rounded p-1.5 text-red-400 hover:bg-red-950/50 hover:text-red-300 transition-colors flex items-center space-x-1"
-                          title="Delete file"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="text-[11px]">Delete</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 5. USER MANAGEMENT TAB */}
-          {activeTab === 'users' && (
-            <div className="space-y-3 text-xs">
-              <div className="rounded-lg border border-amber-800/70 bg-amber-950/40 px-4 py-3 text-amber-100">
-                <div className="flex items-start space-x-2">
-                  <ShieldAlert className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-300" />
-                  <p>
-                    Self-protection is enforced: current administrators cannot delete their own account, lock themselves, or remove their own admin role.
-                  </p>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/40">
-                <table className="w-full text-left">
-                  <thead className="border-b border-slate-800 bg-[#080d1c] text-[11px] uppercase text-slate-400">
-                    <tr>
-                      <th className="px-3 py-2 font-semibold">User</th>
-                      <th className="px-3 py-2 font-semibold">Role</th>
-                      <th className="px-3 py-2 font-semibold">Status</th>
-                      <th className="px-3 py-2 font-semibold">Last active</th>
-                      <th className="px-3 py-2 text-right font-semibold">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {users.map((managedUser) => {
-                      const isSelf = managedUser.id === currentUserId;
-
-                      return (
-                        <tr key={managedUser.id} className="hover:bg-slate-900/60">
-                          <td className="px-3 py-3">
-                            <div className="font-semibold text-white">{managedUser.name}</div>
-                            <div className="text-[11px] text-slate-400">{managedUser.email}</div>
-                          </td>
-                          <td className="px-3 py-3">
-                            <CustomSelect
-                              value={managedUser.role}
-                              disabled={isSelf}
-                              onChange={(val: string) => onUpdateUser(managedUser.id, { role: val as UserRole })}
-                              options={[
-                                { value: 'admin', label: 'Administrator', icon: <ShieldCheck className="h-3 w-3 text-blue-400" /> },
-                                { value: 'manager', label: 'Manager', icon: <UserCheck className="h-3 w-3 text-indigo-400" /> },
-                                { value: 'member', label: 'Member', icon: <Users className="h-3 w-3 text-emerald-400" /> },
-                                { value: 'viewer', label: 'Viewer', icon: <Eye className="h-3 w-3 text-slate-400" /> },
-                              ]}
-                              className="w-28"
-                              buttonClassName="py-1 px-2 text-xs"
-                            />
-                          </td>
-                          <td className="px-3 py-3">
-                            <span className={`rounded px-2 py-1 text-[10px] font-semibold uppercase ${managedUser.locked
-                              ? 'bg-red-950 text-red-300 border border-red-800'
-                              : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                              }`}>
-                              {managedUser.locked ? 'Locked' : 'Active'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 font-mono text-[11px] text-slate-400">{formatFriendlyDate(managedUser.lastActive)}</td>
-                          <td className="px-3 py-3">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                onClick={() => onUpdateUser(managedUser.id, { locked: !managedUser.locked })}
-                                disabled={isSelf}
-                                className="inline-flex items-center space-x-1 rounded border border-slate-700 bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                {managedUser.locked ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-                                <span>{managedUser.locked ? 'Unlock' : 'Lock'}</span>
-                              </button>
-                              <button
-                                onClick={() => onDeleteUser(managedUser.id)}
-                                disabled={isSelf}
-                                className="inline-flex items-center space-x-1 rounded border border-red-800 bg-red-950/70 px-2.5 py-1 text-[11px] font-semibold text-red-200 hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                <span>Delete</span>
-                              </button>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-white">{log.targetName}</span>
+                              <span className="text-[10px] text-slate-500 font-mono">{new Date(log.timestamp).toLocaleString()}</span>
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* 6. AUDIT LOGS TAB */}
-          {activeTab === 'logs' && (
-            <div className="space-y-4 text-xs font-sans">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-slate-200">Audit Trail History ({auditLogs.filter(log => adminLogFilter === 'ALL' || log.action === adminLogFilter).length})</h4>
-                {onClearAuditLogs && auditLogs.length > 0 && (
-                  <button
-                    onClick={onClearAuditLogs}
-                    className="flex items-center space-x-1 rounded bg-red-950/80 border border-red-800/80 px-2.5 py-1 text-red-300 hover:bg-red-900 hover:text-white transition-colors text-[11px]"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span>Clear Audit History</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Filter pills */}
-              <div className="flex flex-wrap gap-1 text-[10px]">
-                <button
-                  type="button"
-                  onClick={() => setAdminLogFilter('ALL')}
-                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'ALL' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
-                >
-                  All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAdminLogFilter('PERMISSION_CHANGE')}
-                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'PERMISSION_CHANGE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
-                >
-                  Security
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAdminLogFilter('ANNOUNCEMENT_CREATE')}
-                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'ANNOUNCEMENT_CREATE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
-                >
-                  Announcements
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAdminLogFilter('UPLOAD')}
-                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'UPLOAD' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
-                >
-                  Uploads
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAdminLogFilter('DELETE')}
-                  className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${adminLogFilter === 'DELETE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
-                >
-                  Deletes
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                {auditLogs
-                  .filter(log => adminLogFilter === 'ALL' || log.action === adminLogFilter)
-                  .map((log) => (
-                    <div key={log.id} className="flex items-start space-x-3 p-3 rounded-lg bg-slate-900/60 border border-slate-800">
-                      <div className="flex h-7 w-7 items-center justify-center rounded bg-slate-800 text-blue-400 font-mono text-[10px] font-bold flex-shrink-0">
-                        {log.action.substring(0, 3)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-white">{log.targetName}</span>
-                          <span className="text-[10px] text-slate-500 font-mono">{new Date(log.timestamp).toLocaleString()}</span>
+                            <p className="text-slate-300 text-[11px] mt-0.5">{log.details}</p>
+                            <div className="flex items-center space-x-2 mt-1 text-[10px] text-slate-400">
+                              <span>By: <strong className="text-blue-300">{log.performedBy}</strong></span>
+                              <span>•</span>
+                              <span className="uppercase font-mono text-slate-500">Role: {log.role}</span>
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-slate-300 text-[11px] mt-0.5">{log.details}</p>
-                        <div className="flex items-center space-x-2 mt-1 text-[10px] text-slate-400">
-                          <span>By: <strong className="text-blue-300">{log.performedBy}</strong></span>
-                          <span>•</span>
-                          <span className="uppercase font-mono text-slate-500">Role: {log.role}</span>
-                        </div>
+                      ))}
+                    {auditLogs.filter(log => adminLogFilter === 'ALL' || log.action === adminLogFilter).length === 0 && (
+                      <div className="text-center py-10 text-xs text-slate-500">
+                        No events found in this category.
                       </div>
-                    </div>
-                  ))}
-                {auditLogs.filter(log => adminLogFilter === 'ALL' || log.action === adminLogFilter).length === 0 && (
-                  <div className="text-center py-10 text-xs text-slate-500">
-                    No events found in this category.
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

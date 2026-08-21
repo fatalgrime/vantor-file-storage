@@ -150,14 +150,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           )}
 
-          {/* Admin Dashboard Action Button */}
-          {canManagePlatform && (
+          {/* Admin / Manager Dashboard Action Button */}
+          {(canManagePlatform || currentRole === 'manager') && (
             <button
               onClick={onOpenAdminPanel}
               className="flex items-center space-x-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:from-blue-500 hover:to-indigo-500 transition-all shadow-md"
             >
               <Sparkles className="h-3.5 w-3.5" />
-              <span>Admin Dashboard</span>
+              <span>{currentRole === 'manager' ? 'Manager Dashboard' : 'Admin Dashboard'}</span>
             </button>
           )}
 

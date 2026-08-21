@@ -1829,9 +1829,10 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         repository={currentRepository}
       />
 
-      {/* Admin Dashboard Drawer / Modal */}
+      {/* Admin / Manager Dashboard Drawer / Modal */}
       <AdminDashboard
-        isOpen={isAdminDashboardOpen && canManagePlatform}
+        isOpen={isAdminDashboardOpen && (canManagePlatform || effectiveRole === 'manager')}
+        role={effectiveRole}
         onClose={() => setIsAdminDashboardOpen(false)}
         folders={folders}
         files={files}
