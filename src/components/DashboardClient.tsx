@@ -16,6 +16,7 @@ import { FooterSummary } from './FooterSummary';
 import { Breadcrumbs } from './Breadcrumbs';
 import { ToastProvider, useToast } from './ToastProvider';
 import { AnnouncementBanner } from './AnnouncementBanner';
+import { CustomSelect } from './CustomSelect';
 import {
   ALL_USER_ROLES,
   canDeleteContent as userCanDeleteContent,
@@ -1919,41 +1920,38 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
 
                 {dialog.type === 'move' && (
                   <div className="space-y-3">
-                    <label className="block text-xs font-semibold text-slate-300">
-                      Target Repository
-                      <select
-                        autoFocus
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-semibold text-slate-300">Target Repository</label>
+                      <CustomSelect
                         value={dialog.destinationRepositoryId}
-                        onChange={(event) => setDialog({
+                        onChange={(val: string) => setDialog({
                           ...dialog,
-                          destinationRepositoryId: event.target.value,
+                          destinationRepositoryId: val,
                           destinationFolderId: 'root'
                         })}
-                        className="mt-1.5 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs text-white outline-none focus:border-blue-500"
-                      >
-                        {visibleRepositories.map((repo) => (
-                          <option key={repo.id} value={repo.id}>
-                            {repo.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        options={visibleRepositories.map((repo) => ({
+                          value: repo.id,
+                          label: repo.name,
+                          icon: <Folder className="h-3.5 w-3.5 text-blue-400" />
+                        }))}
+                      />
+                    </div>
 
-                    <label className="block text-xs font-semibold text-slate-300">
-                      Destination Folder
-                      <select
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-semibold text-slate-300">Destination Folder</label>
+                      <CustomSelect
                         value={dialog.destinationFolderId}
-                        onChange={(event) => setDialog({ ...dialog, destinationFolderId: event.target.value })}
-                        className="mt-1.5 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs text-white outline-none focus:border-blue-500"
-                      >
-                        <option value="root">/ (Repository Root)</option>
-                        {getMoveDestinations(dialog.item, dialog.isFolder, dialog.destinationRepositoryId).map((folder) => (
-                          <option key={folder.id} value={folder.id}>
-                            {getFolderPathString(folder, folders)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        onChange={(val: string) => setDialog({ ...dialog, destinationFolderId: val })}
+                        options={[
+                          { value: 'root', label: '/ (Repository Root)', icon: <Folder className="h-3.5 w-3.5 text-blue-400" /> },
+                          ...getMoveDestinations(dialog.item, dialog.isFolder, dialog.destinationRepositoryId).map((folder) => ({
+                            value: folder.id,
+                            label: getFolderPathString(folder, folders),
+                            icon: <Folder className="h-3.5 w-3.5 text-amber-400" />
+                          }))
+                        ]}
+                      />
+                    </div>
                   </div>
                 )}
               </div>

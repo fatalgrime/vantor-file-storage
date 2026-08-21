@@ -21,6 +21,7 @@ import {
 import { VantorFile, VantorFolder, PermissionLevel, UserRole, VantorUser, Collaborator, ShareLink } from '../lib/types';
 import { ALL_USER_ROLES } from '../lib/authorization';
 import { useToast } from './ToastProvider';
+import { CustomSelect } from './CustomSelect';
 
 interface AccessControlModalProps {
   item: VantorFile | VantorFolder | null;
@@ -335,28 +336,33 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-slate-300 font-sans">Invite User to Collaborate</label>
-                <div className="flex gap-2">
-                  <select
-                    value={inviteUserId}
-                    onChange={(e) => setInviteUserId(e.target.value)}
-                    className="flex-grow rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
-                  >
-                    <option value="">Choose a user...</option>
-                    {inviteableUsers.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name} ({u.email})
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex gap-2 items-center">
+                  <div className="flex-grow">
+                    <CustomSelect
+                      value={inviteUserId}
+                      onChange={setInviteUserId}
+                      placeholder="Choose a user..."
+                      options={[
+                        { value: '', label: 'Choose a user...', icon: <UserPlus className="h-3.5 w-3.5 text-slate-400" /> },
+                        ...inviteableUsers.map((u) => ({
+                          value: u.id,
+                          label: `${u.name} (${u.email})`,
+                          icon: <Users className="h-3.5 w-3.5 text-blue-400" />,
+                        })),
+                      ]}
+                    />
+                  </div>
 
-                  <select
-                    value={inviteRole}
-                    onChange={(e) => setInviteRole(e.target.value as 'viewer' | 'editor')}
-                    className="w-24 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
-                  >
-                    <option value="viewer">Viewer</option>
-                    <option value="editor">Editor</option>
-                  </select>
+                  <div className="w-28">
+                    <CustomSelect
+                      value={inviteRole}
+                      onChange={(val: string) => setInviteRole(val as 'viewer' | 'editor')}
+                      options={[
+                        { value: 'viewer', label: 'Viewer', icon: <Eye className="h-3.5 w-3.5 text-slate-400" /> },
+                        { value: 'editor', label: 'Editor', icon: <UserPlus className="h-3.5 w-3.5 text-emerald-400" /> },
+                      ]}
+                    />
+                  </div>
 
                   <button
                     onClick={handleInvite}
@@ -450,18 +456,18 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                   {/* Expiration selection */}
                   <div className="space-y-1.5">
                     <label className="block text-xs font-semibold text-slate-300">Access Expiration</label>
-                    <select
+                    <CustomSelect
                       value={expirationType}
-                      onChange={(e) => setExpirationType(e.target.value as any)}
-                      className="w-full rounded-lg border border-slate-800 bg-[#060a17] px-3.5 py-2 text-xs text-white outline-none focus:border-blue-500 transition-colors"
-                    >
-                      <option value="never">Never Expires</option>
-                      <option value="1h">1 Hour</option>
-                      <option value="1d">1 Day</option>
-                      <option value="7d">7 Days</option>
-                      <option value="30d">30 Days</option>
-                      <option value="custom">Custom Date</option>
-                    </select>
+                      onChange={(val: string) => setExpirationType(val as any)}
+                      options={[
+                        { value: 'never', label: 'Never Expires', icon: <Calendar className="h-3.5 w-3.5 text-blue-400" /> },
+                        { value: '1h', label: '1 Hour', icon: <Calendar className="h-3.5 w-3.5 text-cyan-400" /> },
+                        { value: '1d', label: '1 Day', icon: <Calendar className="h-3.5 w-3.5 text-emerald-400" /> },
+                        { value: '7d', label: '7 Days', icon: <Calendar className="h-3.5 w-3.5 text-amber-400" /> },
+                        { value: '30d', label: '30 Days', icon: <Calendar className="h-3.5 w-3.5 text-purple-400" /> },
+                        { value: 'custom', label: 'Custom Date', icon: <Calendar className="h-3.5 w-3.5 text-rose-400" /> },
+                      ]}
+                    />
                   </div>
 
                   {/* Download Permissions Option */}

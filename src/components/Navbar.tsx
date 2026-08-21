@@ -16,10 +16,14 @@ import {
   Trash2,
   HelpCircle,
   RefreshCw,
-  ChevronDown
+  ChevronDown,
+  Filter,
+  Folder,
+  FileText
 } from 'lucide-react';
 import { UserButton, useUser, SignInButton } from '@clerk/nextjs';
 import { UserRole } from '../lib/types';
+import { CustomSelect } from './CustomSelect';
 
 interface NavbarProps {
   searchQuery: string;
@@ -283,41 +287,37 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* Type Filter */}
-          <div className="relative">
-            <select
+          {/* Type Filter Custom Dropdown */}
+          <div className="w-40 sm:w-44">
+            <CustomSelect
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className={`border text-xs font-medium rounded-md px-3 py-1.5 cursor-pointer focus:outline-none focus:border-blue-500 transition-colors ${isDark
-                ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
-                : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
-                }`}
-            >
-              <option value="ALL">Type: All</option>
-              <option value="Folder">Folders</option>
-              <option value="Markdown document">Markdown</option>
-              <option value="PDF Document">PDF Documents</option>
-              <option value="SVG Vector Image">Images</option>
-              <option value="JSON Document">JSON / Configs</option>
-              <option value="ZIP Archive">Archives</option>
-            </select>
+              onChange={setTypeFilter}
+              options={[
+                { value: 'ALL', label: 'Type: All', icon: <Filter className="h-3 w-3 text-blue-400" /> },
+                { value: 'Folder', label: 'Folders', icon: <Folder className="h-3 w-3 text-amber-400" /> },
+                { value: 'Markdown document', label: 'Markdown', icon: <FileText className="h-3 w-3 text-blue-400" /> },
+                { value: 'PDF Document', label: 'PDF Documents', icon: <FileText className="h-3 w-3 text-red-400" /> },
+                { value: 'SVG Vector Image', label: 'Images', icon: <Grid className="h-3 w-3 text-emerald-400" /> },
+                { value: 'JSON Document', label: 'JSON / Configs', icon: <SlidersHorizontal className="h-3 w-3 text-cyan-400" /> },
+                { value: 'ZIP Archive', label: 'Archives', icon: <Download className="h-3 w-3 text-purple-400" /> },
+              ]}
+              buttonClassName="py-1.5 px-3 bg-slate-900/90 border-slate-800 hover:border-slate-700 text-slate-300"
+            />
           </div>
 
-          {/* Modified Date Filter */}
-          <div className="relative">
-            <select
+          {/* Modified Date Filter Custom Dropdown */}
+          <div className="w-44 sm:w-48">
+            <CustomSelect
               value={modifiedFilter}
-              onChange={(e) => setModifiedFilter(e.target.value)}
-              className={`border text-xs font-medium rounded-md px-3 py-1.5 cursor-pointer focus:outline-none focus:border-blue-500 transition-colors ${isDark
-                ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
-                : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
-                }`}
-            >
-              <option value="ALL">Modified: Any time</option>
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="last week">Last week</option>
-            </select>
+              onChange={setModifiedFilter}
+              options={[
+                { value: 'ALL', label: 'Modified: Any time', icon: <SlidersHorizontal className="h-3 w-3 text-blue-400" /> },
+                { value: 'today', label: 'Today', icon: <Sparkles className="h-3 w-3 text-amber-400" /> },
+                { value: 'yesterday', label: 'Yesterday', icon: <RefreshCw className="h-3 w-3 text-cyan-400" /> },
+                { value: 'last week', label: 'Last week', icon: <HelpCircle className="h-3 w-3 text-emerald-400" /> },
+              ]}
+              buttonClassName="py-1.5 px-3 bg-slate-900/90 border-slate-800 hover:border-slate-700 text-slate-300"
+            />
           </div>
         </div>
 

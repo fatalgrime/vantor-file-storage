@@ -25,13 +25,19 @@ import {
   AlertTriangle,
   Info,
   Eye,
-  EyeOff
+  EyeOff,
+  BookOpen,
+  Code,
+  Globe,
+  Shield,
+  UserCheck
 } from 'lucide-react';
 import { VantorFile, VantorFolder, AuditLog, PermissionLevel, UserRole, VantorUser, Announcement, AnnouncementType } from '../lib/types';
 import { ALL_USER_ROLES } from '../lib/authorization';
 import { useToast } from './ToastProvider';
 import { formatFriendlyDate, formatBytes } from '../lib/dateUtils';
 import { TOTAL_STORAGE_CAPACITY_BYTES, MAX_SINGLE_FILE_BYTES } from '../lib/db';
+import { CustomSelect } from './CustomSelect';
 
 export type AdminTab = 'upload' | 'folder' | 'announcements' | 'files' | 'logs' | 'users';
 
@@ -251,7 +257,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-      <div className="relative w-full max-w-4xl rounded-xl border border-[#1e3059] bg-[#070c18] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-4xl rounded-xl border border-[#1e3059] bg-[#070c18] shadow-2xl overflow-hidden flex flex-col min-h-[550px] max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1e3059] px-6 py-4 bg-[#090f22]">
           <div className="flex items-center space-x-3">
@@ -260,7 +266,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
             <div>
               <h2 className="font-bold text-lg text-white">Vantor Admin Security Dashboard</h2>
-              <p className="text-xs text-slate-400">System Management, Announcements & Storage Quotas</p>
+              <p className="text-xs text-slate-400">System Management, Metadata Control & User Permissions</p>
             </div>
           </div>
 
@@ -291,7 +297,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="flex items-center space-x-2 bg-slate-900/40 p-2 rounded-lg border border-slate-800/60">
-            <Megaphone className="h-4 w-4 text-white" />
+            <Megaphone className="h-4 w-4 text-blue-400" />
             <div>
               <span className="text-slate-400 block text-[10px] uppercase">Announcements</span>
               <span className="font-mono font-bold text-white text-xs">{activeAnnouncementsCount} active</span>
@@ -316,13 +322,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center overflow-x-auto border-b border-slate-800 px-6 bg-[#080d1c] text-xs font-medium scrollbar-none">
+        <div className="flex items-center overflow-x-auto border-b border-slate-800 px-6 bg-[#080d1c] text-xs font-medium scrollbar-none w-full">
           <button
             onClick={() => setActiveTab('upload')}
             className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'upload' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
-            <Upload className="h-3.5 w-3.5" />
+            <Upload className={`h-3.5 w-3.5 ${activeTab === 'upload' ? 'text-blue-400' : 'text-slate-400'}`} />
             <span>Upload File</span>
           </button>
 
@@ -331,7 +337,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'folder' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
-            <FolderPlus className="h-3.5 w-3.5" />
+            <FolderPlus className={`h-3.5 w-3.5 ${activeTab === 'folder' ? 'text-blue-400' : 'text-slate-400'}`} />
             <span>Create Folder</span>
           </button>
 
@@ -340,10 +346,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'announcements' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
-            <Megaphone className="h-3.5 w-3.5 text-white" />
+            <Megaphone className={`h-3.5 w-3.5 ${activeTab === 'announcements' ? 'text-blue-400' : 'text-slate-400'}`} />
             <span>Announcements</span>
             {activeAnnouncementsCount > 0 && (
-              <span className="ml-1 rounded-full bg-blue-900/80 border border-blue-600 px-1.5 py-0.2 text-[10px] text-blue-300 font-mono">
+              <span className={`ml-1 rounded-full border px-1.5 py-0.2 text-[10px] font-mono ${
+                activeTab === 'announcements' ? 'bg-blue-900/80 border-blue-600 text-blue-300' : 'bg-slate-800 border-slate-700 text-slate-400'
+              }`}>
                 {activeAnnouncementsCount}
               </span>
             )}
@@ -354,7 +362,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'files' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
-            <Sliders className="h-3.5 w-3.5" />
+            <Sliders className={`h-3.5 w-3.5 ${activeTab === 'files' ? 'text-blue-400' : 'text-slate-400'}`} />
             <span>Manage Metadata</span>
           </button>
 
@@ -363,7 +371,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'users' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
-            <Users className="h-3.5 w-3.5" />
+            <Users className={`h-3.5 w-3.5 ${activeTab === 'users' ? 'text-blue-400' : 'text-slate-400'}`} />
             <span>User Management</span>
           </button>
 
@@ -372,7 +380,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'logs' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
-            <Clock className="h-3.5 w-3.5" />
+            <Clock className={`h-3.5 w-3.5 ${activeTab === 'logs' ? 'text-blue-400' : 'text-slate-400'}`} />
             <span>Audit Logs</span>
           </button>
         </div>
@@ -397,47 +405,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">Category</label>
-                  <select
+                  <CustomSelect
                     value={fileCategory}
-                    onChange={(e) => setFileCategory(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="Documents & Assets">Documents & Assets</option>
-                    <option value="Documentation">Documentation</option>
-                    <option value="Brand Assets">Brand Assets</option>
-                    <option value="System Logs">System Logs</option>
-                    <option value="Source Code">Source Code</option>
-                  </select>
+                    onChange={setFileCategory}
+                    options={[
+                      { value: 'Documents & Assets', label: 'Documents & Assets', icon: <FileText className="h-3.5 w-3.5 text-blue-400" /> },
+                      { value: 'Documentation', label: 'Documentation', icon: <BookOpen className="h-3.5 w-3.5 text-emerald-400" /> },
+                      { value: 'Brand Assets', label: 'Brand Assets', icon: <Sparkles className="h-3.5 w-3.5 text-amber-400" /> },
+                      { value: 'System Logs', label: 'System Logs', icon: <Activity className="h-3.5 w-3.5 text-cyan-400" /> },
+                      { value: 'Source Code', label: 'Source Code', icon: <Code className="h-3.5 w-3.5 text-purple-400" /> },
+                    ]}
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">Target Parent Folder</label>
-                  <select
+                  <CustomSelect
                     value={targetFolderId}
-                    onChange={(e) => setTargetFolderId(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="root">Root Directory (Vantor Cloud Storage Repository)</option>
-                    {folders.map((f) => (
-                      <option key={f.id} value={f.id}>{f.name}</option>
-                    ))}
-                  </select>
+                    onChange={setTargetFolderId}
+                    options={[
+                      { value: 'root', label: 'Root Directory (Vantor Cloud Storage Repository)', icon: <HardDrive className="h-3.5 w-3.5 text-blue-400" /> },
+                      ...folders.map((f) => ({ value: f.id, label: f.name, icon: <Folder className="h-3.5 w-3.5 text-amber-400" /> })),
+                    ]}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">Access Control Policy</label>
-                  <select
+                  <CustomSelect
                     value={filePermission}
-                    onChange={(e) => setFilePermission(e.target.value as PermissionLevel)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="public">Public (All Authenticated Users)</option>
-                    <option value="authenticated">Authenticated Only</option>
-                    <option value="role_restricted">Role Restricted (Engineers/Analysts)</option>
-                    <option value="admin_only">Admin Only (Strict Confidential)</option>
-                  </select>
+                    onChange={(val: string) => setFilePermission(val as PermissionLevel)}
+                    options={[
+                      { value: 'public', label: 'Public (All Authenticated Users)', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
+                      { value: 'authenticated', label: 'Authenticated Only', icon: <UserCheck className="h-3.5 w-3.5 text-blue-400" /> },
+                      { value: 'role_restricted', label: 'Role Restricted (Engineers/Analysts)', icon: <Shield className="h-3.5 w-3.5 text-amber-400" /> },
+                      { value: 'admin_only', label: 'Admin Only (Strict Confidential)', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -464,10 +470,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-slate-300 font-semibold">Select File (Max 50MB)</label>
-                  <span className="text-[10px] text-blue-400 font-mono">Upgraded Capacity: 50 GB Total Storage</span>
-                </div>
+                <label className="block text-slate-300 font-semibold mb-1">Select File (Max 50MB)</label>
                 <div className="relative w-full bg-[#040813] border border-slate-800 rounded-lg p-2 flex items-center justify-center">
                   <input
                     ref={fileInputRef}
@@ -519,15 +522,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">Access Control Level</label>
-                <select
+                <CustomSelect
                   value={folderPermission}
-                  onChange={(e) => setFolderPermission(e.target.value as PermissionLevel)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                >
-                  <option value="public">Public Share</option>
-                  <option value="authenticated">Authenticated Users</option>
-                  <option value="admin_only">Admin Only</option>
-                </select>
+                  onChange={(val: string) => setFolderPermission(val as PermissionLevel)}
+                  options={[
+                    { value: 'public', label: 'Public Share', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
+                    { value: 'authenticated', label: 'Authenticated Users', icon: <UserCheck className="h-3.5 w-3.5 text-blue-400" /> },
+                    { value: 'admin_only', label: 'Admin Only', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
+                  ]}
+                />
               </div>
 
               <div className="pt-3">
@@ -568,16 +571,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                     <div>
                       <label className="block text-slate-300 font-semibold mb-1">Badge Type</label>
-                      <select
+                      <CustomSelect
                         value={announcementType}
-                        onChange={(e) => setAnnouncementType(e.target.value as AnnouncementType)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                      >
-                        <option value="info">Information (Blue)</option>
-                        <option value="warning">Warning (Amber)</option>
-                        <option value="alert">Alert (Rose)</option>
-                        <option value="success">Success (Emerald)</option>
-                      </select>
+                        onChange={(val: string) => setAnnouncementType(val as AnnouncementType)}
+                        options={[
+                          { value: 'info', label: 'Information (Blue)', icon: <Info className="h-3.5 w-3.5 text-blue-400" /> },
+                          { value: 'warning', label: 'Warning (Amber)', icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-400" /> },
+                          { value: 'alert', label: 'Alert (Rose)', icon: <ShieldAlert className="h-3.5 w-3.5 text-rose-400" /> },
+                          { value: 'success', label: 'Success (Emerald)', icon: <CheckCircle className="h-3.5 w-3.5 text-emerald-400" /> },
+                        ]}
+                      />
                     </div>
                   </div>
 
@@ -876,16 +879,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <div className="text-[11px] text-slate-400">{managedUser.email}</div>
                           </td>
                           <td className="px-3 py-3">
-                            <select
+                            <CustomSelect
                               value={managedUser.role}
                               disabled={isSelf}
-                              onChange={(event) => onUpdateUser(managedUser.id, { role: event.target.value as UserRole })}
-                              className="rounded-md border border-slate-800 bg-slate-900 px-2 py-1 text-xs text-white disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <option value="admin">Admin</option>
-                              <option value="author">Author</option>
-                              <option value="viewer">Viewer</option>
-                            </select>
+                              onChange={(val: string) => onUpdateUser(managedUser.id, { role: val as UserRole })}
+                              options={[
+                                { value: 'admin', label: 'Admin', icon: <ShieldCheck className="h-3 w-3 text-blue-400" /> },
+                                { value: 'author', label: 'Author', icon: <UserCheck className="h-3 w-3 text-emerald-400" /> },
+                                { value: 'viewer', label: 'Viewer', icon: <Eye className="h-3 w-3 text-slate-400" /> },
+                              ]}
+                              className="w-28"
+                              buttonClassName="py-1 px-2 text-xs"
+                            />
                           </td>
                           <td className="px-3 py-3">
                             <span className={`rounded px-2 py-1 text-[10px] font-semibold uppercase ${managedUser.locked
