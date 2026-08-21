@@ -1,6 +1,6 @@
-export type PermissionLevel = 'public' | 'authenticated' | 'role_restricted' | 'admin_only';
+export type PermissionLevel = 'public' | 'authenticated' | 'role_restricted' | 'private';
 
-export type UserRole = 'admin' | 'author' | 'viewer';
+export type UserRole = 'admin' | 'manager' | 'member' | 'viewer';
 
 export interface Collaborator {
   userId: string;
@@ -53,6 +53,7 @@ export interface VantorFolder {
   description: string;
   permissionLevel: PermissionLevel;
   allowedRoles: UserRole[];
+  allowedUserIds?: string[];
   itemCount: number;
   totalSize: number;
   formattedSize: string;

@@ -288,16 +288,16 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                   </div>
 
                   <div
-                    onClick={() => setPermissionLevel('admin_only')}
-                    className={`flex items-start space-x-3 rounded-lg border p-3 cursor-pointer transition-all ${permissionLevel === 'admin_only'
+                    onClick={() => setPermissionLevel('private')}
+                    className={`flex items-start space-x-3 rounded-lg border p-3 cursor-pointer transition-all ${permissionLevel === 'private'
                       ? 'border-blue-500 bg-blue-950/40 ring-1 ring-blue-500/50'
                       : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
                       }`}
                   >
                     <Lock className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
                     <div>
-                      <h4 className="font-bold text-white text-xs">Admin Only</h4>
-                      <p className="text-[11px] text-slate-400">Restricted exclusively to Platform Administrators.</p>
+                      <h4 className="font-bold text-white text-xs">Private</h4>
+                      <p className="text-[11px] text-slate-400">Restricted exclusively to explicitly authorized users.</p>
                     </div>
                   </div>
                 </div>

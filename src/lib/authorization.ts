@@ -1,6 +1,6 @@
 import { PermissionLevel, UserRole, VantorFile, VantorFolder, VantorRepository } from './types';
 
-export const ALL_USER_ROLES: UserRole[] = ['admin', 'author', 'viewer'];
+export const ALL_USER_ROLES: UserRole[] = ['admin', 'manager', 'member', 'viewer'];
 
 export const hasRepositoryAccess = (
   role: UserRole,
@@ -9,13 +9,11 @@ export const hasRepositoryAccess = (
   allFiles: VantorFile[] = [],
   allFolders: VantorFolder[] = []
 ): boolean => {
-  if (role === 'admin') return true;
+  if (role === 'admin' || role === 'manager') return true;
 
-  if (role === 'author') {
-    return repository.assignedRoles?.includes('author') || repository.assignedUserIds?.includes(userId);
+  if (repository.assignedRoles?.includes(role) || repository.assignedUserIds?.includes(userId)) {
+    return true;
   }
-
-  if (repository.assignedUserIds?.includes(userId)) return true;
 
   const repoId = repository.id;
   const hasFolderInvite = allFolders.some(
@@ -36,12 +34,12 @@ export const canEditRepository = (
   userId: string,
   repository: VantorRepository
 ): boolean => {
-  if (role === 'admin') return true;
-  if (role !== 'author') return false;
-  return repository.assignedRoles?.includes('author') || repository.assignedUserIds?.includes(userId);
+  if (role === 'admin' || role === 'manager') return true;
+  if (role === 'viewer') return false;
+  return repository.assignedRoles?.includes(role) || repository.assignedUserIds?.includes(userId);
 };
 
-export const canDeleteContent = (role: UserRole): boolean => role === 'admin';
+export const canDeleteContent = (role: UserRole): boolean => role === 'admin' || role === 'manager';
 
 export const canManagePlatform = (role: UserRole): boolean => role === 'admin';
 
@@ -52,7 +50,7 @@ export const canReadItem = (
   allFolders: VantorFolder[] = [],
   repository: VantorRepository | undefined = undefined
 ): boolean => {
-  if (role === 'admin') return true;
+  if (role === 'admin' || role === 'manager') return true;
 
   if (item.collaborators?.some((c) => c.userId === userId)) return true;
 
@@ -64,25 +62,17 @@ export const canReadItem = (
     currentParentId = parentFolder.parentId;
   }
 
-  if (role === 'viewer') {
-    if (repository && repository.assignedUserIds?.includes(userId)) {
-      switch (item.permissionLevel) {
-        case 'admin_only':
-          return false;
-        case 'role_restricted':
-          return item.allowedRoles?.includes(role) ?? false;
-        default:
-          return true;
-      }
-    }
-    return false;
-  }
+  const level = item.permissionLevel as PermissionLevel;
 
-  switch (item.permissionLevel) {
-    case 'admin_only':
-      return false;
+  switch (level) {
+    case 'public':
+      return true;
+    case 'authenticated':
+      return Boolean(userId);
     case 'role_restricted':
       return item.allowedRoles?.includes(role) ?? false;
+    case 'private':
+      return item.allowedUserIds?.includes(userId) ?? false;
     default:
       return true;
   }
@@ -95,7 +85,8 @@ export const canEditItem = (
   allFolders: VantorFolder[] = [],
   repository: VantorRepository | undefined = undefined
 ): boolean => {
-  if (role === 'admin') return true;
+  if (role === 'admin' || role === 'manager') return true;
+  if (role === 'viewer') return false;
 
   if (repository && canEditRepository(role, userId, repository)) return true;
 

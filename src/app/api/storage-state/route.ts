@@ -27,7 +27,7 @@ const defaultState = {
     updatedAt: '2026-01-01T00:00:00.000Z',
     createdBy: 'System Operator',
     assignedUserIds: [],
-    assignedRoles: ['admin', 'author', 'viewer'],
+    assignedRoles: ['admin', 'manager', 'member', 'viewer'],
   }]) as VantorRepository[],
   changelog: INITIAL_HERO_CHANGELOG,
   changelogs: {} as Record<string, any>,

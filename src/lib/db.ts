@@ -26,7 +26,7 @@ export const INITIAL_REPOSITORIES: VantorRepository[] = [
     updatedAt: '2026-01-01T00:00:00.000Z',
     createdBy: 'System Operator',
     assignedUserIds: [],
-    assignedRoles: ['admin', 'author', 'viewer'],
+    assignedRoles: ['admin', 'manager', 'member', 'viewer'],
   },
 ];
 

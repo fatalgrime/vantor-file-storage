@@ -232,7 +232,8 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                 group.forEach(u => {
                   if (u.id !== user.id) {
                     if (u.role === 'admin') bestRole = 'admin';
-                    else if (u.role === 'author' && bestRole !== 'admin') bestRole = 'author';
+                    else if (u.role === 'manager' && bestRole !== 'admin') bestRole = 'manager';
+                    else if (u.role === 'member' && bestRole !== 'admin' && bestRole !== 'manager') bestRole = 'member';
                   }
                 });
                 resolvedUsers.push({
@@ -246,7 +247,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                 // None match current user.id. Select the best one to keep
                 let bestUser = group[0];
                 group.forEach(u => {
-                  const roleRank = (r: string) => r === 'admin' ? 3 : r === 'author' ? 2 : 1;
+                  const roleRank = (r: string) => r === 'admin' ? 4 : r === 'manager' ? 3 : r === 'member' ? 2 : 1;
                   if (roleRank(u.role) > roleRank(bestUser.role)) {
                     bestUser = u;
                   } else if (roleRank(u.role) === roleRank(bestUser.role)) {
@@ -767,6 +768,34 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     }
 
     const targetRepoId = currentRepositoryId || DEFAULT_REPOSITORY_ID;
+    let finalContent = newFileData.content;
+    let r2Url = '';
+
+    if (newFileData.content && newFileData.content.startsWith('data:')) {
+      try {
+        const fetchRes = await fetch(newFileData.content);
+        const blob = await fetchRes.blob();
+        const formData = new FormData();
+        const fileId = `file-${Date.now()}`;
+        formData.append('file', blob, newFileData.name || 'file');
+        formData.append('fileId', fileId);
+
+        const r2Res = await fetch('/api/r2/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (r2Res.ok) {
+          const r2Data = await r2Res.json();
+          if (r2Data.isR2 && r2Data.url) {
+            r2Url = r2Data.url;
+            finalContent = undefined;
+          }
+        }
+      } catch (err) {
+        console.warn('R2 upload fallback to inline state:', err);
+      }
+    }
 
     const newFile: VantorFile = {
       id: `file-${Date.now()}`,
@@ -781,7 +810,8 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
       folderId: destFolderId,
       description: newFileData.description || 'Uploaded asset',
       tags: newFileData.tags || ['upload'],
-      content: newFileData.content,
+      content: finalContent,
+      url: r2Url || undefined,
       repositoryId: targetRepoId,
       permissionLevel: newFileData.permissionLevel || 'public',
       allowedRoles: newFileData.allowedRoles || ALL_USER_ROLES,
@@ -923,7 +953,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
       updatedAt: new Date().toISOString(),
       createdBy: displayName,
       assignedUserIds: [],
-      assignedRoles: ['author'],
+      assignedRoles: ['manager', 'member'],
     };
     const nextRepositories = [...repositories, newRepository];
     setRepositories(nextRepositories);

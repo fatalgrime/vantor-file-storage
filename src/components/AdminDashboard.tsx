@@ -438,10 +438,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     value={filePermission}
                     onChange={(val: string) => setFilePermission(val as PermissionLevel)}
                     options={[
-                      { value: 'public', label: 'Public (All Authenticated Users)', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
-                      { value: 'authenticated', label: 'Authenticated Only', icon: <UserCheck className="h-3.5 w-3.5 text-blue-400" /> },
-                      { value: 'role_restricted', label: 'Role Restricted (Engineers/Analysts)', icon: <Shield className="h-3.5 w-3.5 text-amber-400" /> },
-                      { value: 'admin_only', label: 'Admin Only (Strict Confidential)', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
+                      { value: 'public', label: 'Public (Anyone with link)', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
+                      { value: 'authenticated', label: 'Authenticated Users', icon: <UserCheck className="h-3.5 w-3.5 text-blue-400" /> },
+                      { value: 'role_restricted', label: 'Role Restricted (Specific Roles)', icon: <Shield className="h-3.5 w-3.5 text-amber-400" /> },
+                      { value: 'private', label: 'Private (Authorized Users Only)', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
                     ]}
                   />
                 </div>
@@ -526,9 +526,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   value={folderPermission}
                   onChange={(val: string) => setFolderPermission(val as PermissionLevel)}
                   options={[
-                    { value: 'public', label: 'Public Share', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
+                    { value: 'public', label: 'Public (Anyone with link)', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
                     { value: 'authenticated', label: 'Authenticated Users', icon: <UserCheck className="h-3.5 w-3.5 text-blue-400" /> },
-                    { value: 'admin_only', label: 'Admin Only', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
+                    { value: 'role_restricted', label: 'Role Restricted', icon: <Shield className="h-3.5 w-3.5 text-amber-400" /> },
+                    { value: 'private', label: 'Private (Authorized Users Only)', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
                   ]}
                 />
               </div>
@@ -885,8 +886,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               disabled={isSelf}
                               onChange={(val: string) => onUpdateUser(managedUser.id, { role: val as UserRole })}
                               options={[
-                                { value: 'admin', label: 'Admin', icon: <ShieldCheck className="h-3 w-3 text-blue-400" /> },
-                                { value: 'author', label: 'Author', icon: <UserCheck className="h-3 w-3 text-emerald-400" /> },
+                                { value: 'admin', label: 'Administrator', icon: <ShieldCheck className="h-3 w-3 text-blue-400" /> },
+                                { value: 'manager', label: 'Manager', icon: <UserCheck className="h-3 w-3 text-indigo-400" /> },
+                                { value: 'member', label: 'Member', icon: <Users className="h-3 w-3 text-emerald-400" /> },
                                 { value: 'viewer', label: 'Viewer', icon: <Eye className="h-3 w-3 text-slate-400" /> },
                               ]}
                               className="w-28"

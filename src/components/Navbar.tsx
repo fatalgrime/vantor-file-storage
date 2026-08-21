@@ -109,7 +109,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className={`px-2 text-[11px] font-medium uppercase ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Role:</span>
               <button
                 onClick={() => setCurrentRole('admin')}
-                className={`flex items-center space-x-1 rounded px-2.5 py-1 font-medium transition-all ${currentRole === 'admin'
+                className={`flex items-center space-x-1 rounded px-2 py-0.5 font-medium transition-all ${currentRole === 'admin'
                   ? 'bg-blue-600 text-white shadow-sm'
                   : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-800'
                   }`}
@@ -118,18 +118,28 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span>Admin</span>
               </button>
               <button
-                onClick={() => setCurrentRole('author')}
-                className={`flex items-center space-x-1 rounded px-2.5 py-1 font-medium transition-all ${currentRole === 'author'
+                onClick={() => setCurrentRole('manager')}
+                className={`flex items-center space-x-1 rounded px-2 py-0.5 font-medium transition-all ${currentRole === 'manager'
                   ? isDark ? 'bg-slate-700 text-white shadow-sm' : 'bg-gray-300 text-gray-900 shadow-sm'
                   : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-800'
                   }`}
               >
                 <UserCheck className="h-3 w-3" />
-                <span>Author</span>
+                <span>Manager</span>
+              </button>
+              <button
+                onClick={() => setCurrentRole('member')}
+                className={`flex items-center space-x-1 rounded px-2 py-0.5 font-medium transition-all ${currentRole === 'member'
+                  ? isDark ? 'bg-slate-700 text-white shadow-sm' : 'bg-gray-300 text-gray-900 shadow-sm'
+                  : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-800'
+                  }`}
+              >
+                <UserCheck className="h-3 w-3" />
+                <span>Member</span>
               </button>
               <button
                 onClick={() => setCurrentRole('viewer')}
-                className={`flex items-center space-x-1 rounded px-2.5 py-1 font-medium transition-all ${currentRole === 'viewer'
+                className={`flex items-center space-x-1 rounded px-2 py-0.5 font-medium transition-all ${currentRole === 'viewer'
                   ? isDark ? 'bg-slate-700 text-white shadow-sm' : 'bg-gray-300 text-gray-900 shadow-sm'
                   : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-800'
                   }`}

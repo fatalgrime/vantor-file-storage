@@ -844,9 +844,9 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                   <h4 className="font-bold text-sm text-white">Current Access Policy: {file.permissionLevel.toUpperCase()}</h4>
                 </div>
                 <p className="text-slate-300 leading-relaxed">
-                  {file.permissionLevel === 'public' && 'This file is accessible to all authenticated Vantor Cloud workspace users.'}
+                  {file.permissionLevel === 'public' && 'This file is accessible to anyone with the share link.'}
                   {file.permissionLevel === 'authenticated' && 'Requires valid Vantor user authentication via Clerk.'}
-                  {file.permissionLevel === 'admin_only' && 'Strictly restricted to users with System Administrator privileges.'}
+                  {file.permissionLevel === 'private' && 'Strictly restricted to explicitly authorized users and Administrators.'}
                   {file.permissionLevel === 'role_restricted' && `Restricted to assigned roles: ${file.allowedRoles.join(', ')}.`}
                 </p>
               </div>
