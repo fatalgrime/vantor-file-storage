@@ -219,7 +219,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className={`pl-2 border-l ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
             {isSignedIn ? (
               <UserButton
-                afterSignOutUrl="/"
                 appearance={{
                   elements: {
                     avatarBox: `w-8 h-8 rounded-full border-2 ${isDark ? 'border-blue-500/70' : 'border-blue-500'}`,

@@ -142,7 +142,8 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
 
     if (!response.ok) {
       const payload = await response.json().catch(() => null);
-      throw new Error(payload?.error || 'Failed to persist changes.');
+      const errorMessage = payload?.error || `HTTP ${response.status}: Failed to persist changes.`;
+      throw new Error(errorMessage);
     }
   };
 

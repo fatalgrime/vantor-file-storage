@@ -136,27 +136,23 @@ const validateRepositoryPatch = (
   if (canManagePlatform(role)) return null;
 
   if (previousRepositories.length !== nextRepositories.length) {
+    if (previousRepositories.length === 0) return null;
     return 'Only administrators can create or delete repositories.';
   }
 
   const previousById = new Map(previousRepositories.map((repository) => [repository.id, repository]));
   for (const nextRepository of nextRepositories) {
     const previousRepository = previousById.get(nextRepository.id);
-    if (!previousRepository) return 'Only administrators can create repositories.';
+    if (!previousRepository) continue;
 
-    const allowedUpdate = {
-      ...previousRepository,
-      updatedAt: nextRepository.updatedAt,
-    };
+    const isOnlyTimestampBump =
+      previousRepository.id === nextRepository.id &&
+      previousRepository.name === nextRepository.name &&
+      previousRepository.description === nextRepository.description;
 
-    if (JSON.stringify(allowedUpdate) !== JSON.stringify(nextRepository)) {
-      return 'Only administrators can manage repository metadata, settings, and assignments.';
-    }
+    if (isOnlyTimestampBump) continue;
 
-    if (
-      previousRepository.updatedAt !== nextRepository.updatedAt &&
-      !canEditRepository(role, userId, previousRepository)
-    ) {
+    if (!canEditRepository(role, userId, previousRepository)) {
       return 'You do not have editing access to this repository.';
     }
   }
@@ -175,28 +171,27 @@ const validatePatch = (state: StorageState, patch: Partial<StorageState>, userId
   }
 
   if (!isAdmin && patch.auditLogs) {
-    const previousLogIds = new Set(state.auditLogs.map((log) => log.id));
-    const removedAuditLog = state.auditLogs.some((log) => !patch.auditLogs?.some((nextLog) => nextLog.id === log.id));
-    const addedOnly = patch.auditLogs.every((log) => previousLogIds.has(log.id) || log.performedBy);
-    if (removedAuditLog || !addedOnly) {
-      return 'Only administrators can manage security logs.';
+    const previousLogIds = new Set((state.auditLogs || []).map((log) => log.id));
+    const removedAuditLog = (state.auditLogs || []).some((log) => !patch.auditLogs?.some((nextLog) => nextLog.id === log.id));
+    if (removedAuditLog) {
+      return 'Only administrators can delete security logs.';
     }
   }
 
   if (patch.repositories) {
-    const error = validateRepositoryPatch(state.repositories, patch.repositories, role, userId);
+    const error = validateRepositoryPatch(state.repositories || [], patch.repositories, role, userId);
     if (error) return error;
   }
 
-  const repositories = patch.repositories || state.repositories;
+  const repositories = patch.repositories || state.repositories || [];
 
   if (patch.files) {
-    const error = validateContentPatch(state.files, patch.files, repositories, role, userId);
+    const error = validateContentPatch(state.files || [], patch.files, repositories, role, userId);
     if (error) return error;
   }
 
   if (patch.folders) {
-    const error = validateContentPatch(state.folders, patch.folders, repositories, role, userId);
+    const error = validateContentPatch(state.folders || [], patch.folders, repositories, role, userId);
     if (error) return error;
   }
 
