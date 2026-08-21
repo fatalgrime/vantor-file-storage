@@ -92,27 +92,23 @@ export const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({
       <div className="relative overflow-hidden rounded-lg border border-[#1e3059] bg-[#070c18] px-3.5 py-2.5 shadow-lg">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
           {/* Content section */}
-          <div className="flex items-center space-x-2.5 flex-1 min-w-0">
-            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-slate-800 bg-slate-900/90">
+          <div className="flex items-start sm:items-center space-x-3 flex-1 min-w-0">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-slate-800 bg-slate-900/90 shadow-sm mt-0.5 sm:mt-0">
               {style.icon}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1 text-xs">
-              <span className={`inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide font-mono ${style.badge}`}>
+            <div className="min-w-0 flex-1 text-xs leading-relaxed">
+              <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider font-mono mr-2 align-middle ${style.badge}`}>
                 {currentAnnouncement.type}
               </span>
-
-              <div className="flex items-center space-x-1.5 min-w-0 flex-wrap">
-                <span className="font-bold text-white tracking-tight">
-                  {currentAnnouncement.title}:
-                </span>
-                <span className="text-slate-300 font-normal">
-                  {currentAnnouncement.content}
-                </span>
-              </div>
-
+              <span className="font-bold text-white tracking-tight mr-1.5 align-middle">
+                {currentAnnouncement.title}:
+              </span>
+              <span className="text-slate-300 font-normal align-middle">
+                {currentAnnouncement.content}
+              </span>
               {visibleAnnouncements.length > 1 && (
-                <span className="text-[10px] font-mono font-semibold text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                <span className="ml-2 inline-flex items-center text-[10px] font-mono font-semibold text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 align-middle">
                   {safeIndex + 1}/{visibleAnnouncements.length}
                 </span>
               )}
