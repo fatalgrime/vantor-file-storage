@@ -93,22 +93,19 @@ export const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
           {/* Content section */}
           <div className="flex items-start sm:items-center space-x-3 flex-1 min-w-0">
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-slate-800 bg-slate-900/90 shadow-sm mt-0.5 sm:mt-0">
+            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-slate-800 bg-slate-900/90 shadow-sm mt-0.5 sm:mt-0">
               {style.icon}
             </div>
 
-            <div className="min-w-0 flex-1 text-xs leading-relaxed">
-              <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider font-mono mr-2 align-middle ${style.badge}`}>
-                {currentAnnouncement.type}
-              </span>
-              <span className="font-bold text-white tracking-tight mr-1.5 align-middle">
+            <div className="min-w-0 flex-1 text-xs leading-normal">
+              <span className="font-bold text-white tracking-tight mr-1.5">
                 {currentAnnouncement.title}:
               </span>
-              <span className="text-slate-300 font-normal align-middle">
+              <span className="text-slate-300 font-normal">
                 {currentAnnouncement.content}
               </span>
               {visibleAnnouncements.length > 1 && (
-                <span className="ml-2 inline-flex items-center text-[10px] font-mono font-semibold text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 align-middle">
+                <span className="ml-2 inline-flex items-center text-[10px] font-mono font-semibold text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
                   {safeIndex + 1}/{visibleAnnouncements.length}
                 </span>
               )}

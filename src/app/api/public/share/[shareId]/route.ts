@@ -25,8 +25,9 @@ const isDescendant = (folderId: string, ancestorId: string, folders: VantorFolde
 
 export async function GET(
   request: Request,
-  { params }: { params: { shareId: string } }
+  props: { params: Promise<{ shareId: string }> }
 ) {
+  const params = await props.params;
   const { shareId } = params;
   const { searchParams } = new URL(request.url);
   const passwordQuery = searchParams.get('password') || undefined;
@@ -125,8 +126,9 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { shareId: string } }
+  props: { params: Promise<{ shareId: string }> }
 ) {
+  const params = await props.params;
   const { shareId } = params;
 
   try {
