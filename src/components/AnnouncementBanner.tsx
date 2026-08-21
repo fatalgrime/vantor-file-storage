@@ -14,7 +14,6 @@ import {
   ExternalLink,
   Sparkles
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface AnnouncementBannerProps {
   announcements: Announcement[];
@@ -25,45 +24,30 @@ interface AnnouncementBannerProps {
 const typeStyles: Record<
   AnnouncementType,
   {
-    bg: string;
-    border: string;
     badge: string;
     text: string;
     icon: React.ReactNode;
-    glow: string;
   }
 > = {
   info: {
-    bg: 'from-blue-950/80 via-[#071330]/90 to-indigo-950/80',
-    border: 'border-blue-500/40 hover:border-blue-500/70',
-    badge: 'bg-blue-900/80 text-blue-300 border-blue-600/60',
-    text: 'text-blue-200',
-    icon: <Megaphone className="h-4 w-4 text-blue-400" />,
-    glow: 'shadow-[0_0_15px_rgba(59,130,246,0.15)]',
+    badge: 'bg-blue-950/90 text-blue-300 border-blue-700/80',
+    text: 'text-slate-200',
+    icon: <Megaphone className="h-3.5 w-3.5 text-blue-400" />,
   },
   warning: {
-    bg: 'from-amber-950/80 via-[#1e1503]/90 to-yellow-950/80',
-    border: 'border-amber-500/40 hover:border-amber-500/70',
-    badge: 'bg-amber-900/80 text-amber-300 border-amber-600/60',
-    text: 'text-amber-200',
-    icon: <AlertTriangle className="h-4 w-4 text-amber-400" />,
-    glow: 'shadow-[0_0_15px_rgba(245,158,11,0.15)]',
+    badge: 'bg-amber-950/90 text-amber-300 border-amber-700/80',
+    text: 'text-slate-200',
+    icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />,
   },
   alert: {
-    bg: 'from-red-950/80 via-[#1f070e]/90 to-rose-950/80',
-    border: 'border-rose-500/40 hover:border-rose-500/70',
-    badge: 'bg-rose-900/80 text-rose-300 border-rose-600/60',
-    text: 'text-rose-200',
-    icon: <ShieldAlert className="h-4 w-4 text-rose-400" />,
-    glow: 'shadow-[0_0_15px_rgba(244,63,94,0.15)]',
+    badge: 'bg-rose-950/90 text-rose-300 border-rose-700/80',
+    text: 'text-slate-200',
+    icon: <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />,
   },
   success: {
-    bg: 'from-emerald-950/80 via-[#031c14]/90 to-teal-950/80',
-    border: 'border-emerald-500/40 hover:border-emerald-500/70',
-    badge: 'bg-emerald-900/80 text-emerald-300 border-emerald-600/60',
-    text: 'text-emerald-200',
-    icon: <CheckCircle className="h-4 w-4 text-emerald-400" />,
-    glow: 'shadow-[0_0_15px_rgba(16,185,129,0.15)]',
+    badge: 'bg-emerald-950/90 text-emerald-300 border-emerald-700/80',
+    text: 'text-slate-200',
+    icon: <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />,
   },
 };
 
@@ -105,52 +89,46 @@ export const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({
   };
 
   return (
-    <div className="w-full transition-all duration-300">
-      <div
-        className={`relative overflow-hidden rounded-xl border bg-gradient-to-r ${style.bg} ${style.border} ${style.glow} p-4 backdrop-blur-md transition-all duration-300`}
-      >
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          {/* Main content section */}
-          <div className="flex items-start space-x-3 flex-1 min-w-0">
-            <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm">
+    <div className="w-full">
+      <div className="relative overflow-hidden rounded-lg border border-[#1e3059] bg-[#070c18] px-3.5 py-2.5 shadow-lg">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+          {/* Content section */}
+          <div className="flex items-center space-x-2.5 flex-1 min-w-0">
+            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-slate-800 bg-slate-900/90">
               {style.icon}
             </div>
 
-            <div className="space-y-1 min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${style.badge}`}
-                >
-                  {currentAnnouncement.type}
-                </span>
+            <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
+              <span className={`inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide font-mono ${style.badge}`}>
+                {currentAnnouncement.type}
+              </span>
 
-                <h3 className="text-sm font-bold text-white truncate tracking-tight">
-                  {currentAnnouncement.title}
-                </h3>
+              <h3 className="text-xs font-bold text-white tracking-tight truncate">
+                {currentAnnouncement.title}
+              </h3>
 
-                {visibleAnnouncements.length > 1 && (
-                  <span className="text-[10px] font-mono font-medium text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded-full border border-slate-700">
-                    {safeIndex + 1} of {visibleAnnouncements.length}
-                  </span>
-                )}
-              </div>
-
-              <p className={`text-xs ${style.text} leading-relaxed line-clamp-2 sm:line-clamp-none`}>
+              <span className="text-xs text-slate-300 font-normal">
                 {currentAnnouncement.content}
-              </p>
+              </span>
+
+              {visibleAnnouncements.length > 1 && (
+                <span className="text-[10px] font-mono font-semibold text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                  {safeIndex + 1}/{visibleAnnouncements.length}
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Action buttons & navigation controls */}
+          {/* Controls */}
           <div className="flex items-center space-x-2 flex-shrink-0 self-end sm:self-center">
             {currentAnnouncement.linkUrl && (
               <a
                 href={currentAnnouncement.linkUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center space-x-1 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white hover:bg-white/20 transition-all shadow-sm"
+                className="inline-flex items-center space-x-1 rounded-md border border-blue-500/60 bg-blue-600/20 px-2.5 py-1 text-[11px] font-semibold text-blue-300 hover:bg-blue-600/30 transition-all"
               >
-                <span>{currentAnnouncement.linkText || 'View Details'}</span>
+                <span>{currentAnnouncement.linkText || 'Details'}</span>
                 <ExternalLink className="h-3 w-3" />
               </a>
             )}
@@ -158,7 +136,7 @@ export const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({
             {isAdmin && onOpenAdminDashboard && (
               <button
                 onClick={() => onOpenAdminDashboard('announcements')}
-                className="inline-flex items-center space-x-1 rounded-lg border border-blue-500/50 bg-blue-600/30 px-2.5 py-1 text-xs font-semibold text-blue-200 hover:bg-blue-600/50 transition-all"
+                className="inline-flex items-center space-x-1 rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:bg-slate-700 transition-all"
                 title="Manage Announcements"
               >
                 <Sparkles className="h-3 w-3 text-blue-400" />
@@ -167,30 +145,30 @@ export const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({
             )}
 
             {visibleAnnouncements.length > 1 && (
-              <div className="flex items-center space-x-1 border-l border-white/10 pl-2">
+              <div className="flex items-center space-x-0.5 border-l border-slate-800 pl-1.5">
                 <button
                   onClick={handlePrev}
-                  className="rounded-md p-1 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
-                  title="Previous announcement"
+                  className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                  title="Previous"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={handleNext}
-                  className="rounded-md p-1 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
-                  title="Next announcement"
+                  className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                  title="Next"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
             )}
 
             <button
               onClick={handleDismiss}
-              className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white transition-colors ml-1"
-              title="Dismiss announcement banner"
+              className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+              title="Dismiss announcement"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>

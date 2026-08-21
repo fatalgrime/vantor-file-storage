@@ -27,16 +27,5 @@ export const INITIAL_FILES: VantorFile[] = [];
 
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [];
 
-export const INITIAL_ANNOUNCEMENTS: Announcement[] = [
-  {
-    id: 'announcement-1',
-    title: '🚀 Sitewide Storage Upgrade & Infrastructure Enhancement',
-    content: 'Total storage capacity has been increased to 50 GB! Administrators can now publish sitewide announcements and manage high-capacity file assets.',
-    type: 'info',
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    createdBy: 'System Operator',
-    linkText: 'Learn More',
-  },
-];
+export const INITIAL_ANNOUNCEMENTS: Announcement[] = [];
 

@@ -291,7 +291,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="flex items-center space-x-2 bg-slate-900/40 p-2 rounded-lg border border-slate-800/60">
-            <Megaphone className="h-4 w-4 text-purple-400" />
+            <Megaphone className="h-4 w-4 text-white" />
             <div>
               <span className="text-slate-400 block text-[10px] uppercase">Announcements</span>
               <span className="font-mono font-bold text-white text-xs">{activeAnnouncementsCount} active</span>
@@ -340,10 +340,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'announcements' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
-            <Megaphone className="h-3.5 w-3.5 text-purple-400" />
+            <Megaphone className="h-3.5 w-3.5 text-white" />
             <span>Announcements</span>
             {activeAnnouncementsCount > 0 && (
-              <span className="ml-1 rounded-full bg-purple-900/80 border border-purple-600 px-1.5 py-0.2 text-[10px] text-purple-300 font-mono">
+              <span className="ml-1 rounded-full bg-blue-900/80 border border-blue-600 px-1.5 py-0.2 text-[10px] text-blue-300 font-mono">
                 {activeAnnouncementsCount}
               </span>
             )}
@@ -544,15 +544,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* 3. ANNOUNCEMENTS TAB */}
           {activeTab === 'announcements' && (
-            <div className="space-y-6 text-xs font-sans">
+            <div className="space-y-4 text-xs font-sans">
               {/* Announcement Creation Form */}
-              <div className="rounded-xl border border-purple-900/60 bg-purple-950/20 p-4 space-y-4">
-                <div className="flex items-center space-x-2 border-b border-purple-900/40 pb-3">
-                  <Megaphone className="h-4 w-4 text-purple-400" />
+              <div className="rounded-xl border border-[#1e3059] bg-[#090f22] p-4 space-y-3">
+                <div className="flex items-center space-x-2 border-b border-slate-800 pb-2.5">
+                  <Megaphone className="h-4 w-4 text-white" />
                   <h3 className="font-bold text-sm text-white">Create Sitewide Announcement</h3>
-                  <span className="text-[10px] text-purple-300 bg-purple-900/50 px-2 py-0.5 rounded-full border border-purple-700">
-                    Visible to all platform users
-                  </span>
                 </div>
 
                 <form onSubmit={handleAnnouncementSubmit} className="space-y-3">
@@ -562,10 +559,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <input
                         type="text"
                         required
-                        placeholder="e.g. 🚀 Scheduled Maintenance or System Upgrade"
+                        placeholder="e.g. Scheduled Maintenance or Feature Release"
                         value={announcementTitle}
                         onChange={(e) => setAnnouncementTitle(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
                       />
                     </div>
 
@@ -574,7 +571,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <select
                         value={announcementType}
                         onChange={(e) => setAnnouncementType(e.target.value as AnnouncementType)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
                       >
                         <option value="info">Information (Blue)</option>
                         <option value="warning">Warning (Amber)</option>
@@ -588,11 +585,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <label className="block text-slate-300 font-semibold mb-1">Announcement Message *</label>
                     <textarea
                       required
-                      rows={3}
+                      rows={2.5 as any}
                       placeholder="Write your sitewide announcement message..."
                       value={announcementContent}
                       onChange={(e) => setAnnouncementContent(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
                     />
                   </div>
 
@@ -604,7 +601,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         placeholder="https://..."
                         value={announcementLinkUrl}
                         onChange={(e) => setAnnouncementLinkUrl(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
                       />
                     </div>
 
@@ -615,25 +612,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         placeholder="e.g. Read Release Notes"
                         value={announcementLinkText}
                         onChange={(e) => setAnnouncementLinkText(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
                       />
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center justify-between pt-1">
                     <label className="flex items-center space-x-2 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={announcementIsActive}
                         onChange={(e) => setAnnouncementIsActive(e.target.checked)}
-                        className="rounded border-slate-800 bg-slate-900 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                        className="rounded border-slate-800 bg-slate-900 text-blue-600 focus:ring-blue-500 h-4 w-4"
                       />
                       <span className="text-slate-300 font-semibold">Publish immediately (Active)</span>
                     </label>
 
                     <button
                       type="submit"
-                      className="rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-lg transition-all flex items-center space-x-1.5"
+                      className="rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-bold text-white shadow-md transition-all flex items-center space-x-1.5"
                     >
                       <Plus className="h-4 w-4" />
                       <span>Publish Announcement</span>
@@ -646,7 +643,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="font-bold text-slate-200 flex items-center space-x-2">
-                    <Megaphone className="h-4 w-4 text-purple-400" />
+                    <Megaphone className="h-4 w-4 text-white" />
                     <span>Sitewide Announcements ({announcements.length})</span>
                   </h4>
 
@@ -654,19 +651,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="flex items-center space-x-1 text-[10px]">
                     <button
                       onClick={() => setAnnouncementFilter('ALL')}
-                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'ALL' ? 'bg-purple-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'ALL' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
                     >
                       All ({announcements.length})
                     </button>
                     <button
                       onClick={() => setAnnouncementFilter('ACTIVE')}
-                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'ACTIVE' ? 'bg-purple-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'ACTIVE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
                     >
                       Active ({announcements.filter(a => a.isActive).length})
                     </button>
                     <button
                       onClick={() => setAnnouncementFilter('INACTIVE')}
-                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'INACTIVE' ? 'bg-purple-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
+                      className={`px-2.5 py-0.5 rounded-full font-medium transition-all ${announcementFilter === 'INACTIVE' ? 'bg-blue-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'}`}
                     >
                       Inactive ({announcements.filter(a => !a.isActive).length})
                     </button>
@@ -711,7 +708,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             {announcement.linkUrl && (
                               <>
                                 <span>•</span>
-                                <a href={announcement.linkUrl} target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline flex items-center space-x-1">
+                                <a href={announcement.linkUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline flex items-center space-x-1">
                                   <span>{announcement.linkText || 'Link'}</span>
                                   <LinkIcon className="h-3 w-3 inline" />
                                 </a>
