@@ -32,6 +32,7 @@ export function CustomSelect<T extends string = string>({
   disabled = false,
 }: CustomSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value) || options[0];
@@ -49,13 +50,29 @@ export function CustomSelect<T extends string = string>({
     };
   }, []);
 
+  const handleToggle = () => {
+    if (disabled) return;
+    if (!isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      // If available space below is less than 220px and space above is greater, open upward
+      if (spaceBelow < 220 && spaceAbove > spaceBelow) {
+        setOpenUpward(true);
+      } else {
+        setOpenUpward(false);
+      }
+    }
+    setIsOpen(!isOpen);
+  };
+
   return (
     <div ref={containerRef} className={`relative inline-block w-full text-xs font-sans ${className}`}>
       {/* Trigger Button */}
       <button
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className={`w-full flex items-center justify-between gap-1.5 border px-3 py-1.5 rounded-md text-xs font-medium transition-all focus:outline-none focus:ring-1 focus:ring-blue-500 ${isOpen ? 'border-blue-500 ring-1 ring-blue-500/30' : 'border-slate-800 hover:border-slate-700'
           } ${disabled
             ? 'bg-slate-900/50 text-slate-500 cursor-not-allowed border-slate-850'
@@ -78,7 +95,7 @@ export function CustomSelect<T extends string = string>({
       {/* Custom Dropdown Overlay */}
       {isOpen && (
         <div
-          className={`absolute left-0 right-0 mt-1 z-[120] min-w-full rounded-md border border-slate-700 bg-slate-900 py-1 text-xs shadow-2xl max-h-60 overflow-y-auto scrollbar-thin ${dropdownClassName}`}
+          className={`absolute left-0 right-0 ${openUpward ? 'bottom-full mb-1' : 'top-full mt-1'} z-[150] min-w-full rounded-md border border-slate-700 bg-slate-900 py-1 text-xs shadow-2xl max-h-60 overflow-y-auto scrollbar-thin ${dropdownClassName}`}
         >
           {options.map((option) => {
             const isSelected = option.value === value;

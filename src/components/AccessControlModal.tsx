@@ -190,8 +190,8 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-xl sm:max-w-2xl rounded-xl border border-[#1e3059] bg-[#070d1d] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between border-b border-[#1e3059] px-6 py-4 bg-[#090f22] flex-shrink-0">
+      <div className="relative w-full max-w-xl sm:max-w-2xl rounded-xl border border-[#1e3059] bg-[#070d1d] shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between border-b border-[#1e3059] px-6 py-4 bg-[#090f22] flex-shrink-0 rounded-t-xl">
           <div className="flex items-center space-x-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-950 border border-amber-800 text-amber-400">
               <Lock className="h-4 w-4" />
@@ -611,7 +611,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-end space-x-3 p-5 border-t border-[#1e3059] bg-[#090f22] flex-shrink-0">
+        <div className="flex items-center justify-end space-x-3 p-5 border-t border-[#1e3059] bg-[#090f22] flex-shrink-0 rounded-b-xl">
           <button
             onClick={onClose}
             className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition-colors"

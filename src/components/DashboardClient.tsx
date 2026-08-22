@@ -1865,8 +1865,8 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
 
       {dialog && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-          <div className="w-full max-w-md overflow-hidden rounded-xl border border-[#1e3059] bg-[#070c18] shadow-2xl">
-            <div className="border-b border-[#1e3059] bg-[#090f22] px-5 py-4">
+          <div className="w-full max-w-md rounded-xl border border-[#1e3059] bg-[#070c18] shadow-2xl relative">
+            <div className="border-b border-[#1e3059] bg-[#090f22] px-5 py-4 rounded-t-xl">
               <h2 className="text-base font-bold text-white">
                 {dialog.type === 'rename'
                   ? `Rename ${dialog.isFolder ? 'folder' : 'file'}`
@@ -2022,7 +2022,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2 border-t border-slate-800 bg-[#060a17] px-5 py-3">
+            <div className="flex items-center justify-end gap-2 border-t border-slate-800 bg-[#060a17] px-5 py-3 rounded-b-xl">
               {dialog.type !== 'notice' && (
                 <button
                   onClick={() => setDialog(null)}
