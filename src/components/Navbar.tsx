@@ -26,6 +26,7 @@ import { UserRole } from '../lib/types';
 import { CustomSelect } from './CustomSelect';
 
 interface NavbarProps {
+  showRepositoryIndex?: boolean;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   typeFilter: string;
@@ -51,6 +52,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
+  showRepositoryIndex = false,
   searchQuery,
   setSearchQuery,
   typeFilter,
@@ -286,6 +288,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Type Filter Custom Dropdown */}
           <div className="w-44">
             <CustomSelect
+              disabled={showRepositoryIndex}
               value={typeFilter}
               onChange={setTypeFilter}
               options={[
@@ -304,6 +307,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Modified Date Filter Custom Dropdown */}
           <div className="w-44">
             <CustomSelect
+              disabled={showRepositoryIndex}
               value={modifiedFilter}
               onChange={setModifiedFilter}
               options={[

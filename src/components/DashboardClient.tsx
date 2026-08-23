@@ -1504,6 +1504,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     <div className={`min-h-screen flex flex-col font-sans selection:bg-blue-600 selection:text-white transition-colors duration-300 ${isDark ? 'bg-[#060a17] text-slate-100' : 'bg-gray-50 text-gray-900'}`}>
       {/* Top Navbar Component */}
       <Navbar
+        showRepositoryIndex={showRepositoryIndex}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         typeFilter={typeFilter}
@@ -1524,7 +1525,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         onOpenUploadModal={() => { setAdminTabDefault('upload'); setIsAdminDashboardOpen(true); }}
         onOpenCreateFolderModal={() => { setAdminTabDefault('folder'); setIsAdminDashboardOpen(true); }}
         onOpenAdminPanel={() => { setAdminTabDefault('upload'); setIsAdminDashboardOpen(true); }}
-        currentRole={currentRole}
+        currentRole={effectiveRole}
         setCurrentRole={setCurrentRole}
         canEditRepository={canEditCurrentRepository}
         canDeleteContent={canDeleteContent}
