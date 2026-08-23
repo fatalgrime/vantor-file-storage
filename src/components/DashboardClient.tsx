@@ -7,7 +7,7 @@ import { Navbar } from './Navbar';
 import { formatBytes, formatRelativeTime, getRepositoryLastUpdated, matchesModifiedFilter, sanitizeLegacyStateTimestamps } from '../lib/dateUtils';
 import { detectFileType } from '../lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
-import { HelpCircle, X, Mail, Activity, Upload, Trash2, Key, Folder } from 'lucide-react';
+import { HelpCircle, X, Mail, Activity, Upload, Trash2, Key, Folder, ShieldAlert } from 'lucide-react';
 import { HeroChangelog } from './HeroChangelog';
 import { FileBrowser } from './FileBrowser';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -495,18 +495,23 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   const canEditRepository = (repository: VantorRepository) => userCanEditRepository(effectiveRole, currentUserId, repository);
   const canDeleteContent = userCanDeleteContent(effectiveRole);
   const canManagePlatform = userCanManagePlatform(effectiveRole);
-  const canEditCurrentRepository = currentRepository ? canEditRepository(currentRepository) : false;
+  const canViewCurrentRepository = useMemo(() => {
+    if (!currentRepository) return false;
+    return canViewRepository(currentRepository);
+  }, [currentRepository, effectiveRole, currentUserId, files, folders]);
+  const canEditCurrentRepository = currentRepository && canViewCurrentRepository ? canEditRepository(currentRepository) : false;
   const visibleRepositories = useMemo(() => {
     return repositories.filter((repository) => canViewRepository(repository));
   }, [repositories, effectiveRole, currentUserId, files, folders]);
 
   useEffect(() => {
+    if (!showRepositoryIndex) return;
     if (visibleRepositories.some((repository) => repository.id === currentRepositoryId)) return;
     const nextRepositoryId = visibleRepositories[0]?.id || DEFAULT_REPOSITORY_ID;
     setCurrentRepositoryId(nextRepositoryId);
     setCurrentFolderId(null);
     setSelectedIds([]);
-  }, [visibleRepositories, currentRepositoryId]);
+  }, [visibleRepositories, currentRepositoryId, showRepositoryIndex]);
 
   const repositoryFolders = useMemo(() => {
     return folders.filter((folder) => (folder.repositoryId || DEFAULT_REPOSITORY_ID) === currentRepositoryId && (currentRepository ? canViewRepository(currentRepository) : false));
@@ -1742,35 +1747,55 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
               <div className="h-4 w-96 bg-slate-700 rounded"></div>
             </section>
           ) : currentRepository ? (
-            <section className="rounded-lg border border-[#1e3059] bg-[#070c18] p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase text-blue-300">Repository</p>
-                  <h1 className="mt-1 truncate text-xl font-bold text-white">{currentRepository.name}</h1>
-                  <p className="mt-1 text-xs text-slate-400">{currentRepository.description}</p>
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] font-mono text-slate-400">
-                    <span>Created by {currentRepository.createdBy}</span>
-                    <span>Updated {formatRelativeTime(getRepositoryLastUpdated(currentRepository, files, folders, auditLogs), currentRepository.createdAt)}</span>
+            canViewCurrentRepository ? (
+              <section className="rounded-lg border border-[#1e3059] bg-[#070c18] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase text-blue-300">Repository</p>
+                    <h1 className="mt-1 truncate text-xl font-bold text-white">{currentRepository.name}</h1>
+                    <p className="mt-1 text-xs text-slate-400">{currentRepository.description}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] font-mono text-slate-400">
+                      <span>Created by {currentRepository.createdBy}</span>
+                      <span>Updated {formatRelativeTime(getRepositoryLastUpdated(currentRepository, files, folders, auditLogs), currentRepository.createdAt)}</span>
+                    </div>
                   </div>
+                  {canManagePlatform && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleRenameRepository(currentRepository)}
+                        className="rounded border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                      >
+                        Settings
+                      </button>
+                      <button
+                        onClick={() => handleRequestDeleteRepository(currentRepository)}
+                        className="rounded border border-red-800 bg-red-950/70 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-900"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {canManagePlatform && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleRenameRepository(currentRepository)}
-                      className="rounded border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800"
-                    >
-                      Settings
-                    </button>
-                    <button
-                      onClick={() => handleRequestDeleteRepository(currentRepository)}
-                      className="rounded border border-red-800 bg-red-950/70 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-900"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )}
+              </section>
+            ) : (
+              <div className="rounded-xl border border-red-900/60 bg-[#0c0914] p-8 text-center shadow-xl">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-950/80 border border-red-800 text-red-400 mb-4">
+                  <ShieldAlert className="h-7 w-7" />
+                </div>
+                <h2 className="text-xl font-bold text-white">Access Denied</h2>
+                <p className="mt-2 text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
+                  You do not have permission to access this repository. Contact an administrator or repository manager to request access.
+                </p>
+                <div className="mt-6 flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => router.push('/dashboard')}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500 transition-colors shadow-md"
+                  >
+                    Return to Dashboard
+                  </button>
+                </div>
               </div>
-            </section>
+            )
           ) : (
             <div className="rounded-lg border border-red-800 bg-red-950/30 p-4 text-red-400">
               Repository not found.
@@ -1778,7 +1803,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
           )
         )}
 
-        {!showRepositoryIndex && (
+        {!showRepositoryIndex && currentRepository && canViewCurrentRepository && (
           <Breadcrumbs
             items={currentFolderPath}
             onNavigateFolder={(id) => setCurrentFolderId(id)}
@@ -1786,7 +1811,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
           />
         )}
 
-        {!showRepositoryIndex && (
+        {!showRepositoryIndex && currentRepository && canViewCurrentRepository && (
           <div className="space-y-3">
             <FileBrowser
               folders={displayedFolders}
@@ -1814,9 +1839,9 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
 
       {/* Footer Summary Bar */}
       <FooterSummary
-        fileCount={showRepositoryIndex ? files.length : displayedFiles.length}
-        folderCount={showRepositoryIndex ? folders.length : displayedFolders.length}
-        totalFormattedSize={currentTotalSizeFormatted}
+        fileCount={showRepositoryIndex ? files.length : (canViewCurrentRepository ? displayedFiles.length : 0)}
+        folderCount={showRepositoryIndex ? folders.length : (canViewCurrentRepository ? displayedFolders.length : 0)}
+        totalFormattedSize={showRepositoryIndex || canViewCurrentRepository ? currentTotalSizeFormatted : '0 B'}
       />
 
       <FilePreviewModal

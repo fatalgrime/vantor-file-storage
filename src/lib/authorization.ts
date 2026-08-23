@@ -52,6 +52,10 @@ export const canReadItem = (
 ): boolean => {
   if (role === 'admin' || role === 'manager') return true;
 
+  if (repository && !hasRepositoryAccess(role, userId, repository, [], allFolders)) {
+    return false;
+  }
+
   if (item.collaborators?.some((c) => c.userId === userId)) return true;
 
   let currentParentId = 'parentId' in item ? item.parentId : (item as VantorFile).folderId;
@@ -87,6 +91,10 @@ export const canEditItem = (
 ): boolean => {
   if (role === 'admin' || role === 'manager') return true;
   if (role === 'viewer') return false;
+
+  if (repository && !hasRepositoryAccess(role, userId, repository, [], allFolders)) {
+    return false;
+  }
 
   if (repository && canEditRepository(role, userId, repository)) return true;
 
