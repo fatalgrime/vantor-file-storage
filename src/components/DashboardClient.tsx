@@ -805,10 +805,6 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
 
     const fileInfo = detectFileType(newFileData.name || 'Untitled File', newFileData.mimeType);
 
-    if (finalContent && finalContent.length > 200000 && finalContent.startsWith('data:')) {
-      finalContent = undefined;
-    }
-
     const newFile: VantorFile = {
       id: `file-${Date.now()}`,
       name: newFileData.name || 'Untitled File',
@@ -839,12 +835,22 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     const nextLogs = [createAuditLog('UPLOAD', newFile.name, 'file', `Uploaded file (${newFile.formattedSize})`), ...auditLogs];
     const nextRepositories = touchRepository(targetRepoId);
 
+    // Keep full content in React state so preview works during this session
     setFiles(nextFiles);
     setAuditLogs(nextLogs);
     setRepositories(nextRepositories);
 
+    // Strip large inline content before persisting to avoid bloating the DB and HTTP payload
+    const persistableFiles = nextFiles.map(f => {
+      if (f.content && f.content.length > 200000 && f.content.startsWith('data:')) {
+        const { content: _stripped, ...rest } = f;
+        return rest as VantorFile;
+      }
+      return f;
+    });
+
     try {
-      await persistState({ files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories });
+      await persistState({ files: persistableFiles, auditLogs: nextLogs, repositories: nextRepositories });
       addToast({ type: 'success', title: 'File uploaded', message: `"${newFile.name}" added to repository.` });
     } catch (error) {
       setFiles(files);
