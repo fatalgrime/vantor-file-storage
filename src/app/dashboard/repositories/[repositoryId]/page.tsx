@@ -1,11 +1,12 @@
 import { DashboardClient } from '../../../../components/DashboardClient';
 
 interface RepositoryDashboardPageProps {
-  params: {
+  params: Promise<{
     repositoryId: string;
-  };
+  }>;
 }
 
-export default function RepositoryDashboardPage({ params }: RepositoryDashboardPageProps) {
-  return <DashboardClient initialRepositoryId={params.repositoryId} showRepositoryIndex={false} />;
+export default async function RepositoryDashboardPage({ params }: RepositoryDashboardPageProps) {
+  const { repositoryId } = await params;
+  return <DashboardClient initialRepositoryId={repositoryId} showRepositoryIndex={false} />;
 }

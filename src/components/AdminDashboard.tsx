@@ -32,12 +32,12 @@ import {
   Shield,
   UserCheck
 } from 'lucide-react';
-import { VantorFile, VantorFolder, AuditLog, PermissionLevel, UserRole, VantorUser, Announcement, AnnouncementType } from '../lib/types';
+import { VantorFile, VantorFolder, AuditLog, PermissionLevel, UserRole, VantorUser, Announcement, AnnouncementType, VantorRepository } from '../lib/types';
 import { detectFileType, formatBytes } from '../lib/utils';
 import { ALL_USER_ROLES } from '../lib/authorization';
 import { useToast } from './ToastProvider';
 import { formatFriendlyDate } from '../lib/dateUtils';
-import { TOTAL_STORAGE_CAPACITY_BYTES, MAX_SINGLE_FILE_BYTES } from '../lib/db';
+import { TOTAL_STORAGE_CAPACITY_BYTES, MAX_SINGLE_FILE_BYTES, DEFAULT_REPOSITORY_ID } from '../lib/db';
 import { CustomSelect } from './CustomSelect';
 
 export type AdminTab = 'upload' | 'folder' | 'announcements' | 'files' | 'logs' | 'users';
@@ -51,6 +51,9 @@ interface AdminDashboardProps {
   auditLogs: AuditLog[];
   users: VantorUser[];
   announcements?: Announcement[];
+  repositories?: VantorRepository[];
+  currentRepositoryId?: string;
+  showRepositoryIndex?: boolean;
   currentUserId: string;
   onUploadFile: (newFile: Partial<VantorFile>) => void;
   onCreateFolder: (newFolder: Partial<VantorFolder>) => void;
@@ -75,6 +78,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   auditLogs,
   users,
   announcements = [],
+  repositories = [],
+  currentRepositoryId = '',
+  showRepositoryIndex = true,
   currentUserId,
   onUploadFile,
   onCreateFolder,
@@ -93,6 +99,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<AdminTab>(activeTabDefault);
   const [creationStatus, setCreationStatus] = useState<{ type: 'file' | 'folder'; name: string } | null>(null);
   const [adminLogFilter, setAdminLogFilter] = useState<'ALL' | 'PERMISSION_CHANGE' | 'UPLOAD' | 'DELETE' | 'ANNOUNCEMENT_CREATE'>('ALL');
+  const [adminLogRepoFilter, setAdminLogRepoFilter] = useState<string>('ALL');
   const [announcementFilter, setAnnouncementFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const { addToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -101,8 +108,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (isOpen) {
       setActiveTab(activeTabDefault);
       setCreationStatus(null);
+      if (!showRepositoryIndex && currentRepositoryId) {
+        setAdminLogRepoFilter(currentRepositoryId);
+      } else {
+        setAdminLogRepoFilter('ALL');
+      }
     }
-  }, [activeTabDefault, isOpen]);
+  }, [activeTabDefault, isOpen, showRepositoryIndex, currentRepositoryId]);
 
   useEffect(() => {
     if (isManager && (activeTab === 'files' || activeTab === 'users' || activeTab === 'logs')) {
@@ -126,6 +138,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [folderName, setFolderName] = useState('');
   const [folderDescription, setFolderDescription] = useState('');
   const [folderPermission, setFolderPermission] = useState<PermissionLevel>('public');
+  const [folderTargetId, setFolderTargetId] = useState<string>('root');
 
   // Form states for New Announcement
   const [announcementTitle, setAnnouncementTitle] = useState('');
@@ -134,6 +147,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [announcementLinkUrl, setAnnouncementLinkUrl] = useState('');
   const [announcementLinkText, setAnnouncementLinkText] = useState('');
   const [announcementIsActive, setAnnouncementIsActive] = useState(true);
+
+  const currentRepo = repositories.find(r => r.id === currentRepositoryId);
+  const currentRepoName = currentRepo?.name || 'Vantor Root Repository';
+
+  const targetFolderOptions = [
+    {
+      value: 'root',
+      label: `Root Directory (${currentRepoName})`,
+      icon: <HardDrive className="h-3.5 w-3.5 text-blue-400" />
+    },
+    ...folders.map((f) => {
+      const folderRepo = repositories.find(r => r.id === (f.repositoryId || DEFAULT_REPOSITORY_ID));
+      const repoName = folderRepo ? folderRepo.name : 'Default Repository';
+      const isSubfolder = Boolean(f.parentId);
+      const displayLabel = isSubfolder
+        ? `${f.name} (Subfolder — Repository: ${repoName})`
+        : `${f.name} (Repository: ${repoName})`;
+
+      return {
+        value: f.id,
+        label: displayLabel,
+        icon: <Folder className="h-3.5 w-3.5 text-amber-400" />
+      };
+    })
+  ];
 
   if (!isOpen) return null;
 
@@ -223,7 +261,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const createdFolderName = folderName.trim();
     onCreateFolder({
       name: createdFolderName,
-      parentId: null,
+      parentId: folderTargetId === 'root' ? null : folderTargetId,
       description: folderDescription || 'New folder directory',
       permissionLevel: folderPermission,
       allowedRoles: ALL_USER_ROLES,
@@ -231,6 +269,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     setFolderName('');
     setFolderDescription('');
+    setFolderTargetId('root');
 
     setCreationStatus({ type: 'folder', name: createdFolderName });
   };
@@ -486,10 +525,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <CustomSelect
                         value={targetFolderId}
                         onChange={setTargetFolderId}
-                        options={[
-                          { value: 'root', label: 'Root Directory (Vantor Cloud Storage Repository)', icon: <HardDrive className="h-3.5 w-3.5 text-blue-400" /> },
-                          ...folders.map((f) => ({ value: f.id, label: f.name, icon: <Folder className="h-3.5 w-3.5 text-amber-400" /> })),
-                        ]}
+                        options={targetFolderOptions}
                       />
                     </div>
 
@@ -520,7 +556,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Description</label>
+                    <label className="block text-slate-300 font-semibold mb-1">Description / Notes</label>
                     <input
                       type="text"
                       placeholder="Brief summary of the file..."
@@ -567,6 +603,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       value={folderName}
                       onChange={(e) => setFolderName(e.target.value)}
                       className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Target Parent Folder</label>
+                    <CustomSelect
+                      value={folderTargetId}
+                      onChange={setFolderTargetId}
+                      options={targetFolderOptions}
                     />
                   </div>
 
@@ -997,17 +1042,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {/* 6. AUDIT LOGS TAB */}
               {activeTab === 'logs' && (
                 <div className="space-y-4 text-xs font-sans">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-slate-200">Audit Trail History ({auditLogs.filter(log => adminLogFilter === 'ALL' || log.action === adminLogFilter).length})</h4>
-                    {onClearAuditLogs && auditLogs.length > 0 && (
-                      <button
-                        onClick={onClearAuditLogs}
-                        className="flex items-center space-x-1 rounded bg-red-950/80 border border-red-800/80 px-2.5 py-1 text-red-300 hover:bg-red-900 hover:text-white transition-colors text-[11px]"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        <span>Clear Audit History</span>
-                      </button>
-                    )}
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h4 className="font-bold text-slate-200">
+                      Audit Trail History ({
+                        auditLogs.filter(log => {
+                          if (adminLogFilter !== 'ALL' && log.action !== adminLogFilter) return false;
+                          if (adminLogRepoFilter !== 'ALL') {
+                            const logRepo = log.repositoryId || DEFAULT_REPOSITORY_ID;
+                            if (logRepo !== adminLogRepoFilter) return false;
+                          }
+                          return true;
+                        }).length
+                      })
+                    </h4>
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-1.5 text-xs text-slate-400">
+                        <span className="font-semibold">Repo:</span>
+                        <CustomSelect
+                          value={adminLogRepoFilter}
+                          onChange={setAdminLogRepoFilter}
+                          options={[
+                            { value: 'ALL', label: 'All Repositories', icon: <HardDrive className="h-3 w-3 text-blue-400" /> },
+                            ...(repositories || []).map((repo) => ({
+                              value: repo.id,
+                              label: repo.name,
+                              icon: <Folder className="h-3 w-3 text-amber-400" />,
+                            })),
+                          ]}
+                          className="w-48"
+                          buttonClassName="py-1 px-2.5 text-xs"
+                        />
+                      </div>
+                      {onClearAuditLogs && auditLogs.length > 0 && (
+                        <button
+                          onClick={onClearAuditLogs}
+                          className="flex items-center space-x-1 rounded bg-red-950/80 border border-red-800/80 px-2.5 py-1 text-red-300 hover:bg-red-900 hover:text-white transition-colors text-[11px]"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Clear Audit History</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Filter pills */}
@@ -1051,7 +1126,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                   <div className="space-y-2">
                     {auditLogs
-                      .filter(log => adminLogFilter === 'ALL' || log.action === adminLogFilter)
+                      .filter(log => {
+                        if (adminLogFilter !== 'ALL' && log.action !== adminLogFilter) return false;
+                        if (adminLogRepoFilter !== 'ALL') {
+                          const logRepo = log.repositoryId || DEFAULT_REPOSITORY_ID;
+                          if (logRepo !== adminLogRepoFilter) return false;
+                        }
+                        return true;
+                      })
                       .map((log) => (
                         <div key={log.id} className="flex items-start space-x-3 p-3 rounded-lg bg-slate-900/60 border border-slate-800">
                           <div className="flex h-7 w-7 items-center justify-center rounded bg-slate-800 text-blue-400 font-mono text-[10px] font-bold flex-shrink-0">
@@ -1071,7 +1153,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </div>
                         </div>
                       ))}
-                    {auditLogs.filter(log => adminLogFilter === 'ALL' || log.action === adminLogFilter).length === 0 && (
+                    {auditLogs.filter(log => {
+                      if (adminLogFilter !== 'ALL' && log.action !== adminLogFilter) return false;
+                      if (adminLogRepoFilter !== 'ALL') {
+                        const logRepo = log.repositoryId || DEFAULT_REPOSITORY_ID;
+                        if (logRepo !== adminLogRepoFilter) return false;
+                      }
+                      return true;
+                    }).length === 0 && (
                       <div className="text-center py-10 text-xs text-slate-500">
                         No events found in this category.
                       </div>

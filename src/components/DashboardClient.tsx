@@ -513,6 +513,12 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     setSelectedIds([]);
   }, [visibleRepositories, currentRepositoryId, showRepositoryIndex]);
 
+  useEffect(() => {
+    if (initialRepositoryId && repositories.some((repository) => repository.id === initialRepositoryId)) {
+      setCurrentRepositoryId(initialRepositoryId);
+    }
+  }, [initialRepositoryId, repositories]);
+
   const repositoryFolders = useMemo(() => {
     return folders.filter((folder) => (folder.repositoryId || DEFAULT_REPOSITORY_ID) === currentRepositoryId && (currentRepository ? canViewRepository(currentRepository) : false));
   }, [folders, currentRepositoryId, currentRepository, effectiveRole, currentUserId]);
@@ -793,9 +799,8 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
 
         if (r2Res.ok) {
           const r2Data = await r2Res.json();
-          if (r2Data.isR2 && r2Data.url) {
+          if (r2Data.url) {
             r2Url = r2Data.url;
-            finalContent = undefined;
           }
         }
       } catch (err) {
@@ -1450,9 +1455,10 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     action: AuditLog['action'],
     targetName: string,
     targetType: 'file' | 'folder',
-    details: string
+    details: string,
+    repositoryId?: string
   ) => {
-    const nextLogs = [createAuditLog(action, targetName, targetType, details), ...auditLogs];
+    const nextLogs = [createAuditLog(action, targetName, targetType, details, repositoryId), ...auditLogs];
     setAuditLogs(nextLogs);
     persistState({ auditLogs: nextLogs }).catch((error) => setLoadError(error.message));
   };
@@ -1461,7 +1467,8 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     action: AuditLog['action'],
     targetName: string,
     targetType: 'file' | 'folder',
-    details: string
+    details: string,
+    repositoryId?: string
   ) => {
     const newLog: AuditLog = {
       id: `log-${Date.now()}`,
@@ -1472,6 +1479,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
       role: effectiveRole,
       timestamp: new Date().toISOString(),
       details,
+      repositoryId: repositoryId || currentRepositoryId || DEFAULT_REPOSITORY_ID,
     };
     return newLog;
   };
@@ -1871,6 +1879,9 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         auditLogs={auditLogs}
         users={managedUsers}
         announcements={announcements}
+        repositories={repositories}
+        currentRepositoryId={currentRepositoryId}
+        showRepositoryIndex={showRepositoryIndex}
         currentUserId={user?.id || ''}
         onUploadFile={handleUploadFile}
         onCreateFolder={handleCreateFolder}

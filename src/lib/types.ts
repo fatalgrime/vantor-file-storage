@@ -99,6 +99,7 @@ export interface AuditLog {
   role: UserRole;
   timestamp: string;
   details: string;
+  repositoryId?: string;
 }
 
 export interface HeroChangelogData {

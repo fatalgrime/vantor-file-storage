@@ -265,15 +265,53 @@ export async function PATCH(request: Request) {
     const sql = await ensureState();
     const patch = await request.json();
 
-    // Sanitize large base64 contents from JSON state before persisting to database
+    // Persist file blobs to database & sanitize large base64 contents from JSON state
     if (Array.isArray(patch.files)) {
-      patch.files = patch.files.map((file: VantorFile) => {
-        if (file.content && file.content.length > 200000 && file.content.startsWith('data:')) {
-          const { content: _c, ...rest } = file;
-          return rest;
+      try {
+        await sql`
+          CREATE TABLE IF NOT EXISTS vantor_file_blobs (
+            file_id TEXT PRIMARY KEY,
+            filename TEXT NOT NULL,
+            mime_type TEXT NOT NULL,
+            data BYTEA NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `;
+
+        for (let i = 0; i < patch.files.length; i++) {
+          const file = patch.files[i] as VantorFile;
+          if (file.content && file.content.startsWith('data:') && !file.url) {
+            try {
+              const parts = file.content.split(',');
+              const mimeMatch = parts[0].match(/data:(.*?);/);
+              const mimeType = mimeMatch ? mimeMatch[1] : file.mimeType || 'application/octet-stream';
+              const base64Data = parts[1] || parts[0];
+              const buffer = Buffer.from(base64Data, 'base64');
+              const hexData = `\\x${buffer.toString('hex')}`;
+
+              await sql`
+                INSERT INTO vantor_file_blobs (file_id, filename, mime_type, data)
+                VALUES (${file.id}, ${file.name}, ${mimeType}, ${hexData}::bytea)
+                ON CONFLICT (file_id) DO UPDATE SET
+                  filename = EXCLUDED.filename,
+                  mime_type = EXCLUDED.mime_type,
+                  data = EXCLUDED.data,
+                  created_at = NOW()
+              `;
+
+              file.url = `/api/public/files/${file.id}`;
+            } catch (blobErr) {
+              console.warn('Failed to auto-save file blob during PATCH:', blobErr);
+            }
+          }
+
+          if (file.content && file.content.length > 200000 && file.content.startsWith('data:')) {
+            delete file.content;
+          }
         }
-        return file;
-      });
+      } catch (tableErr) {
+        console.warn('vantor_file_blobs setup/save error:', tableErr);
+      }
     }
 
     const currentRows = await sql`

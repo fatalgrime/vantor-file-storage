@@ -96,24 +96,28 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     const isAudio = file.mimeType.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(file.extension);
     const isVideo = file.mimeType.startsWith('video/') || ['mp4', 'webm', 'ogg', 'mov', 'm4v'].includes(file.extension);
 
-    if ((isAudio || isVideo) && file.content) {
+    if (isAudio || isVideo) {
       let url = '';
-      if (file.content.startsWith('data:')) {
-        url = file.content;
-      } else {
-        try {
-          const base64Data = file.content.split(',')[1] || file.content;
-          const binaryString = window.atob(base64Data);
-          const bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
+      if (file.content) {
+        if (file.content.startsWith('data:')) {
+          url = file.content;
+        } else {
+          try {
+            const base64Data = file.content.split(',')[1] || file.content;
+            const binaryString = window.atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            const blob = new Blob([bytes], { type: file.mimeType });
+            url = URL.createObjectURL(blob);
+          } catch {
+            const blob = new Blob([file.content], { type: file.mimeType });
+            url = URL.createObjectURL(blob);
           }
-          const blob = new Blob([bytes], { type: file.mimeType });
-          url = URL.createObjectURL(blob);
-        } catch {
-          const blob = new Blob([file.content], { type: file.mimeType });
-          url = URL.createObjectURL(blob);
         }
+      } else if (file.url) {
+        url = file.url;
       }
       setMediaUrl(url);
       return () => {
@@ -420,7 +424,8 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 
   const renderContentPreview = () => {
     // 1. Image Viewer with Zoom / Rotate
-    if (file.mimeType.startsWith('image/') && file.content?.startsWith('data:')) {
+    const imageSrc = file.content?.startsWith('data:') ? file.content : file.url;
+    if (file.mimeType.startsWith('image/') && imageSrc) {
       return (
         <div className="flex flex-col space-y-4 items-center w-full">
           {/* Controls Bar */}
@@ -468,7 +473,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
               }}
             />
             <img
-              src={file.content}
+              src={imageSrc}
               alt={file.name}
               className="max-w-full max-h-[50vh] object-contain rounded shadow-lg transition-transform duration-250 ease-out"
               style={{ transform: `scale(${zoom}) rotate(${rotation}deg)`, imageOrientation: 'from-image' }}
