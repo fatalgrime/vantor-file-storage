@@ -61,20 +61,34 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
         }
 
         if (!active) return;
-        if (!file.content) {
+        if (!file.content && !file.url) {
           throw new Error('PDF file has no readable content.');
         }
 
-        // Convert base64 data to Uint8Array
-        const base64Parts = file.content.split(',');
-        const base64Data = base64Parts[1] || base64Parts[0];
-        const binaryString = window.atob(base64Data);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
+        let pdfData: Uint8Array | ArrayBuffer;
+
+        if (file.content) {
+          // Convert base64 data to Uint8Array
+          const base64Parts = file.content.split(',');
+          const base64Data = base64Parts[1] || base64Parts[0];
+          const binaryString = window.atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          pdfData = bytes;
+        } else {
+          // Fetch the PDF from its remote URL (R2 / CDN)
+          const response = await fetch(file.url!);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch PDF from storage (HTTP ${response.status}).`);
+          }
+          pdfData = await response.arrayBuffer();
         }
 
-        const doc = await pdfjs.getDocument({ data: bytes }).promise;
+        if (!active) return;
+
+        const doc = await pdfjs.getDocument({ data: pdfData }).promise;
         if (!active) return;
 
         setPdfDoc(doc);
@@ -95,7 +109,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
     return () => {
       active = false;
     };
-  }, [file.content]);
+  }, [file.content, file.url]);
 
   // Handle rendering a page
   const renderPage = async (pageNumber: number, currentScale: number, fitWidth: boolean) => {
@@ -104,7 +118,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
     try {
       setPageRendering(true);
       const page = await pdfDoc.getPage(pageNumber);
-      
+
       let finalScale = currentScale;
 
       if (fitWidth) {
@@ -220,7 +234,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          
+
           <div className="flex items-center space-x-1 font-mono text-xs">
             <select
               value={currentPage}
@@ -274,11 +288,10 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
 
           <button
             onClick={handleFitWidth}
-            className={`p-1 rounded border transition-colors flex items-center justify-center ${
-              isFitWidth 
-                ? 'bg-blue-950 border-blue-800 text-blue-400' 
-                : 'bg-slate-850 border-slate-800 hover:bg-slate-800 text-slate-200'
-            }`}
+            className={`p-1 rounded border transition-colors flex items-center justify-center ${isFitWidth
+              ? 'bg-blue-950 border-blue-800 text-blue-400'
+              : 'bg-slate-850 border-slate-800 hover:bg-slate-800 text-slate-200'
+              }`}
             title="Fit to Width"
           >
             <Maximize2 className="h-4 w-4" />

@@ -471,7 +471,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
               src={file.content}
               alt={file.name}
               className="max-w-full max-h-[50vh] object-contain rounded shadow-lg transition-transform duration-250 ease-out"
-              style={{ transform: `scale(${zoom}) rotate(${rotation}deg)` }}
+              style={{ transform: `scale(${zoom}) rotate(${rotation}deg)`, imageOrientation: 'from-image' }}
             />
           </div>
         </div>

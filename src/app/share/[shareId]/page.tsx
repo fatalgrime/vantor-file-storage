@@ -542,7 +542,7 @@ export default function PublicSharePage() {
               src={file.content}
               alt={file.name}
               className="max-w-full max-h-[45vh] object-contain rounded shadow-lg transition-transform duration-250 ease-out"
-              style={{ transform: `scale(${zoom}) rotate(${rotation}deg)` }}
+              style={{ transform: `scale(${zoom}) rotate(${rotation}deg)`, imageOrientation: 'from-image' }}
             />
           </div>
         </div>
