@@ -7,8 +7,7 @@ import {
   CornerDownRight,
   CheckCircle,
   Trash2,
-  AtSign,
-  Sparkles
+  AtSign
 } from 'lucide-react';
 import { FileComment, VantorUser, UserRole } from '../lib/types';
 import { formatRelativeTime } from '../lib/dateUtils';
@@ -213,9 +212,6 @@ export const FileCommentsSection: React.FC<FileCommentsSectionProps> = ({
             Discussion & Feedback ({fileComments.length})
           </h4>
         </div>
-        <span className="text-[11px] text-slate-400 font-mono flex items-center">
-          <Sparkles className="h-3 w-3 mr-1 text-amber-400" /> Supports Markdown & @mentions
-        </span>
       </div>
 
       {/* Main Comment Input Form */}
@@ -259,14 +255,7 @@ export const FileCommentsSection: React.FC<FileCommentsSectionProps> = ({
             )}
           </div>
 
-          <div className="flex items-center justify-between pt-1">
-            <div className="flex items-center space-x-2 text-[11px] text-slate-500">
-              <span>Formatting:</span>
-              <code className="bg-slate-900 border border-slate-800 px-1 text-[10px] rounded text-slate-300">**bold**</code>
-              <code className="bg-slate-900 border border-slate-800 px-1 text-[10px] rounded text-slate-300">`code`</code>
-              <code className="bg-slate-900 border border-slate-800 px-1 text-[10px] rounded text-indigo-300">@mention</code>
-            </div>
-
+          <div className="flex items-center justify-end pt-1">
             <button
               type="submit"
               disabled={!newCommentText.trim()}

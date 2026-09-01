@@ -16,7 +16,8 @@ import {
   Copy,
   Plus,
   Eye,
-  Download
+  Download,
+  Flame
 } from 'lucide-react';
 import { VantorFile, VantorFolder, PermissionLevel, UserRole, VantorUser, Collaborator, ShareLink } from '../lib/types';
 import { ALL_USER_ROLES } from '../lib/authorization';
@@ -507,7 +508,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#060a17] px-3 py-2 cursor-pointer hover:border-slate-700 transition-colors">
                       <span className="text-xs font-semibold text-slate-200 flex items-center space-x-1.5">
-                        <span className="text-rose-400 font-bold">🔥</span>
+                        <Flame className="h-3.5 w-3.5 text-rose-400" />
                         <span>One-Time Self-Destruct</span>
                       </span>
                       <input
@@ -576,7 +577,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                           <div className="flex items-center justify-between">
                             <div>
                               <span className="font-bold text-white text-xs flex items-center space-x-1.5">
-                                {link.oneTimeOnly && <span title="One-Time Self-Destruct Link">🔥</span>}
+                                {link.oneTimeOnly && <span title="One-Time Self-Destruct Link"><Flame className="h-3.5 w-3.5 text-rose-400 flex-shrink-0" /></span>}
                                 <span>{link.label}</span>
                               </span>
                               <div className="flex items-center space-x-3 mt-1 text-[11px] text-slate-400">
@@ -610,7 +611,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                                 ? 'bg-red-950 border border-red-900 text-red-400 line-through'
                                 : 'bg-rose-950/90 border border-rose-800 text-rose-300'
                                 }`}>
-                                <span className="mr-1">🔥</span>
+                                <Flame className="h-3 w-3 mr-1 text-rose-400 flex-shrink-0" />
                                 {link.selfDestructed ? 'Self-Destructed (Used)' : 'One-Time Link'}
                               </span>
                             )}

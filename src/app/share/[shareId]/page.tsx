@@ -19,7 +19,8 @@ import {
   Copy,
   ChevronRight as ChevronRightIcon,
   AlertCircle,
-  Loader2
+  Loader2,
+  Flame
 } from 'lucide-react';
 import { VantorFile, VantorFolder, ShareLink } from '../../../lib/types';
 import { useToast } from '../../../components/ToastProvider';
@@ -316,7 +317,7 @@ export default function PublicSharePage() {
         {isOneTimeOnly && (
           <div className="w-full max-w-3xl mb-6 rounded-xl border border-rose-800/80 bg-rose-950/40 p-4 text-center shadow-lg shadow-rose-950/20">
             <div className="flex items-center justify-center space-x-2 text-rose-300 font-bold text-xs uppercase tracking-wide">
-              <span className="text-sm">🔥</span>
+              <Flame className="h-4 w-4 text-rose-400" />
               <span>One-Time Self-Destruct Link</span>
             </div>
             <p className="mt-1 text-xs text-rose-200/80">
