@@ -112,6 +112,42 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
     };
   }, [file.content, file.url]);
 
+  /**
+   * Automatically inspects PDF page text matrices to detect if page content is rendered upside-down (180° inverted).
+   */
+  async function detectPdfPageOrientation(page: any): Promise<number> {
+    try {
+      const textContent = await page.getTextContent();
+      if (textContent && textContent.items && textContent.items.length > 0) {
+        let invertedCount = 0;
+        let uprightCount = 0;
+        let totalCount = 0;
+
+        for (const item of textContent.items) {
+          if (item.transform && item.transform.length >= 4) {
+            const [a, b] = item.transform;
+            let angle = Math.atan2(b, a) * (180 / Math.PI);
+            if (angle < 0) angle += 360;
+
+            totalCount++;
+            if (angle >= 135 && angle <= 225) {
+              invertedCount++;
+            } else if (angle < 45 || angle > 315) {
+              uprightCount++;
+            }
+          }
+        }
+
+        if (totalCount > 0 && invertedCount > uprightCount && (invertedCount / totalCount) > 0.4) {
+          return 180;
+        }
+      }
+    } catch (err) {
+      console.warn('PDF text orientation check warning:', err);
+    }
+    return 0;
+  }
+
   // Handle rendering a page
   const renderPage = async (pageNumber: number, currentScale: number, fitWidth: boolean, currentRotation: number) => {
     if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
@@ -121,7 +157,14 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
       const page = await pdfDoc.getPage(pageNumber);
 
       let finalScale = currentScale;
-      const totalRotation = ((page.rotate || 0) + currentRotation) % 360;
+      const nativeRotate = page.rotate || 0;
+      let autoRot = 0;
+
+      if (nativeRotate === 0) {
+        autoRot = await detectPdfPageOrientation(page);
+      }
+
+      const totalRotation = (nativeRotate + autoRot + currentRotation) % 360;
 
       if (fitWidth) {
         const containerWidth = Math.max(100, containerRef.current.clientWidth - 40); // Subtract padding
