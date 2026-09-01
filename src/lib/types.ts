@@ -123,9 +123,28 @@ export interface ShareLink {
   password?: string;     // Password protection (optional)
   expiresAt?: string;    // Expiration timestamp (optional)
   maxAccessCount?: number; // Maximum visits (optional)
+  oneTimeOnly?: boolean; // Self-destruct after single view or download
+  selfDestructed?: boolean; // Marked true once accessed
   createdAt: string;
   createdBy: string;
   viewsCount: number;
   downloadsCount: number;
 }
+
+export interface FileComment {
+  id: string;
+  fileId: string;
+  authorId: string;
+  authorName: string;
+  authorEmail?: string;
+  authorRole?: UserRole;
+  authorAvatarUrl?: string;
+  content: string; // Markdown text with @mentions
+  createdAt: string; // ISO string
+  updatedAt?: string;
+  parentId?: string | null; // For threaded replies
+  resolved?: boolean;
+  mentions?: string[]; // Array of user names/IDs mentioned
+}
+
 

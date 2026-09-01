@@ -36,8 +36,9 @@ import {
   INITIAL_REPOSITORIES,
   INITIAL_USERS,
   INITIAL_ANNOUNCEMENTS,
+  INITIAL_COMMENTS,
 } from '../lib/db';
-import { VantorFile, VantorFolder, AuditLog, HeroChangelogData, UserRole, PermissionLevel, VantorRepository, VantorUser, Collaborator, ShareLink, Announcement } from '../lib/types';
+import { VantorFile, VantorFolder, AuditLog, HeroChangelogData, UserRole, PermissionLevel, VantorRepository, VantorUser, Collaborator, ShareLink, Announcement, FileComment } from '../lib/types';
 
 interface PersistedState {
   files: VantorFile[];
@@ -49,6 +50,7 @@ interface PersistedState {
   users: VantorUser[];
   announcements?: Announcement[];
   shares?: ShareLink[];
+  comments?: FileComment[];
   settings?: {
     theme?: 'dark' | 'light';
   };
@@ -129,6 +131,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   const [managedUsers, setManagedUsers] = useState<VantorUser[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [shares, setShares] = useState<ShareLink[]>([]);
+  const [comments, setComments] = useState<FileComment[]>([]);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
 
@@ -200,6 +203,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         setAuditLogs(rawAuditLogs);
         setAnnouncements(data.announcements || INITIAL_ANNOUNCEMENTS || []);
         setShares(data.shares || []);
+        setComments(data.comments || INITIAL_COMMENTS || []);
 
         const loadedUsers = data.users || [];
         let activeUsers = [...loadedUsers];
@@ -495,6 +499,49 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   const canEditRepository = (repository: VantorRepository) => userCanEditRepository(effectiveRole, currentUserId, repository);
   const canDeleteContent = userCanDeleteContent(effectiveRole);
   const canManagePlatform = userCanManagePlatform(effectiveRole);
+
+  // Comment Action Handlers
+  const handleAddComment = (fileId: string, content: string, parentId?: string | null, mentions?: string[]) => {
+    const newComment: FileComment = {
+      id: 'comment-' + Math.random().toString(36).substring(2, 11),
+      fileId,
+      authorId: currentUserId || 'user-anonymous',
+      authorName: displayName,
+      authorEmail: user?.primaryEmailAddress?.emailAddress,
+      authorRole: effectiveRole,
+      content,
+      createdAt: new Date().toISOString(),
+      parentId: parentId || null,
+      resolved: false,
+      mentions: mentions || [],
+    };
+
+    const updatedComments = [newComment, ...comments];
+    setComments(updatedComments);
+    persistState({ comments: updatedComments }).catch((err) => console.error('Failed to save comment:', err));
+    addToast({
+      type: 'success',
+      title: 'Comment posted',
+      message: 'Your comment has been added to the discussion.',
+    });
+  };
+
+  const handleResolveComment = (commentId: string) => {
+    const updatedComments = comments.map((c) => (c.id === commentId ? { ...c, resolved: !c.resolved } : c));
+    setComments(updatedComments);
+    persistState({ comments: updatedComments }).catch((err) => console.error('Failed to resolve comment:', err));
+  };
+
+  const handleDeleteComment = (commentId: string) => {
+    const updatedComments = comments.filter((c) => c.id !== commentId && c.parentId !== commentId);
+    setComments(updatedComments);
+    persistState({ comments: updatedComments }).catch((err) => console.error('Failed to delete comment:', err));
+    addToast({
+      type: 'info',
+      title: 'Comment deleted',
+      message: 'The comment was removed.',
+    });
+  };
   const canViewCurrentRepository = useMemo(() => {
     if (!currentRepository) return false;
     return canViewRepository(currentRepository);
@@ -1872,8 +1919,14 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         onDownload={handleDownloadFile}
         role={effectiveRole}
         userId={currentUserId}
+        userName={displayName}
         allFolders={folders}
         repository={currentRepository}
+        comments={comments}
+        users={managedUsers}
+        onAddComment={handleAddComment}
+        onResolveComment={handleResolveComment}
+        onDeleteComment={handleDeleteComment}
       />
 
       {/* Admin / Manager Dashboard Drawer / Modal */}

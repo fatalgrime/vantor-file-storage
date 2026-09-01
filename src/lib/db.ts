@@ -1,4 +1,4 @@
-import { VantorFile, VantorFolder, AuditLog, HeroChangelogData, VantorRepository, VantorUser, Announcement } from './types';
+import { VantorFile, VantorFolder, AuditLog, HeroChangelogData, VantorRepository, VantorUser, Announcement, FileComment } from './types';
 
 const NEON_DATABASE_URL = process.env.DATABASE_URL;
 
@@ -39,4 +39,7 @@ export const INITIAL_FILES: VantorFile[] = [];
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [];
 
 export const INITIAL_ANNOUNCEMENTS: Announcement[] = [];
+
+export const INITIAL_COMMENTS: FileComment[] = [];
+
 

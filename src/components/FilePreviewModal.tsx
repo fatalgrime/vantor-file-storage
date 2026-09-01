@@ -18,9 +18,10 @@ import {
   Eye,
   Info,
 } from 'lucide-react';
-import { VantorFile, UserRole, VantorFolder, VantorRepository } from '../lib/types';
+import { VantorFile, UserRole, VantorFolder, VantorRepository, FileComment, VantorUser } from '../lib/types';
 import { canReadItem, ALL_USER_ROLES } from '../lib/authorization';
 import { FilePreviewViewport } from './preview/FilePreviewViewport';
+import { FileCommentsSection } from './FileCommentsSection';
 
 interface FilePreviewModalProps {
   file: VantorFile | null;
@@ -28,8 +29,14 @@ interface FilePreviewModalProps {
   onDownload: (file: VantorFile) => void;
   role?: UserRole;
   userId?: string;
+  userName?: string;
   allFolders?: VantorFolder[];
   repository?: VantorRepository;
+  comments?: FileComment[];
+  users?: VantorUser[];
+  onAddComment?: (fileId: string, content: string, parentId?: string | null, mentions?: string[]) => void;
+  onResolveComment?: (commentId: string) => void;
+  onDeleteComment?: (commentId: string) => void;
 }
 
 export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
@@ -38,15 +45,22 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   onDownload,
   role = 'admin',
   userId = '',
+  userName = 'Current User',
   allFolders = [],
   repository,
+  comments = [],
+  users = [],
+  onAddComment,
+  onResolveComment,
+  onDeleteComment,
 }) => {
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<'preview' | 'details' | 'security'>('preview');
+  const [activeTab, setActiveTab] = useState<'preview' | 'details' | 'security' | 'comments'>('preview');
 
   if (!file) return null;
 
   const canDownload = canReadItem(role, userId, file, allFolders, repository);
+  const fileCommentsCount = comments.filter((c) => c.fileId === file.id).length;
 
   const handleCopyLink = () => {
     const fakeUrl = `${window.location.origin}/share/${file.id}`;
@@ -95,10 +109,10 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-slate-800 bg-slate-950/40 px-6 pt-2">
+        <div className="flex border-b border-slate-800 bg-slate-950/40 px-6 pt-2 overflow-x-auto">
           <button
             onClick={() => setActiveTab('preview')}
-            className={`pb-2.5 px-4 text-xs font-medium border-b-2 transition-all ${activeTab === 'preview'
+            className={`pb-2.5 px-4 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${activeTab === 'preview'
               ? 'border-blue-500 text-blue-400 font-semibold'
               : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
@@ -106,8 +120,22 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
             File Preview
           </button>
           <button
+            onClick={() => setActiveTab('comments')}
+            className={`pb-2.5 px-4 text-xs font-medium border-b-2 transition-all whitespace-nowrap flex items-center space-x-1.5 ${activeTab === 'comments'
+              ? 'border-blue-500 text-blue-400 font-semibold'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+          >
+            <span>Comments & Discussions</span>
+            {fileCommentsCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-blue-950 border border-blue-800 text-blue-300 font-mono text-[10px] font-bold">
+                {fileCommentsCount}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab('details')}
-            className={`pb-2.5 px-4 text-xs font-medium border-b-2 transition-all ${activeTab === 'details'
+            className={`pb-2.5 px-4 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${activeTab === 'details'
               ? 'border-blue-500 text-blue-400 font-semibold'
               : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
@@ -116,7 +144,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('security')}
-            className={`pb-2.5 px-4 text-xs font-medium border-b-2 transition-all ${activeTab === 'security'
+            className={`pb-2.5 px-4 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${activeTab === 'security'
               ? 'border-blue-500 text-blue-400 font-semibold'
               : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
@@ -128,6 +156,20 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         {/* Body Content */}
         <div className="flex-grow overflow-y-auto p-6 space-y-6">
           {activeTab === 'preview' && renderContentPreview()}
+
+          {activeTab === 'comments' && (
+            <FileCommentsSection
+              fileId={file.id}
+              comments={comments}
+              users={users}
+              currentUserId={userId}
+              currentUserName={userName}
+              currentUserRole={role}
+              onAddComment={onAddComment || (() => {})}
+              onResolveComment={onResolveComment || (() => {})}
+              onDeleteComment={onDeleteComment || (() => {})}
+            />
+          )}
 
           {activeTab === 'details' && (
             <div className="space-y-4 text-xs text-slate-300">
@@ -191,13 +233,13 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                   {file.permissionLevel === 'role_restricted' && `Restricted to assigned organizational roles.`}
                 </p>
               </div>
-              <div className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-4">
+              <div className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-4 font-sans text-xs">
                 <div className="flex items-start space-x-2.5">
                   <Info className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
                   <div className="space-y-1">
-                    <h5 className="font-semibold text-amber-200">Shareable Links & Access</h5>
+                    <h5 className="font-semibold text-amber-200">Shareable Links & Access Control</h5>
                     <p className="text-slate-300 leading-relaxed">
-                      To create and manage shareable links for this file, click the share icon on the file action row in the dashboard.
+                      To create and manage shareable links for this file, click the horizontal three-dots menu icon (<span className="font-semibold text-white">•••</span>) on the file, navigate to <span className="font-semibold text-white">Permissions</span>, and select the <span className="font-semibold text-amber-300">Shareable Links</span> tab.
                     </p>
                   </div>
                 </div>

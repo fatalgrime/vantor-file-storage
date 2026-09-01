@@ -10,9 +10,10 @@ import {
   INITIAL_REPOSITORIES,
   INITIAL_USERS,
   INITIAL_ANNOUNCEMENTS,
+  INITIAL_COMMENTS,
 } from '../../../lib/db';
 import { canEditRepository, canManagePlatform } from '../../../lib/authorization';
-import { VantorFile, VantorFolder, VantorRepository, VantorUser, ShareLink, Announcement } from '../../../lib/types';
+import { VantorFile, VantorFolder, VantorRepository, VantorUser, ShareLink, Announcement, FileComment } from '../../../lib/types';
 
 const STATE_ID = 'default';
 
@@ -38,6 +39,7 @@ const defaultState = {
     theme: 'dark',
   },
   shares: [] as ShareLink[],
+  comments: INITIAL_COMMENTS as FileComment[],
 };
 
 type StorageState = typeof defaultState;

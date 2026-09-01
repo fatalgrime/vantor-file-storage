@@ -56,7 +56,11 @@ export async function GET(
       return NextResponse.json({ error: 'Share link not found' }, { status: 404 });
     }
 
-    // Expiration check
+    // Expiration & One-Time Self-Destruct check
+    if (link.oneTimeOnly && link.selfDestructed) {
+      return NextResponse.json({ error: 'This one-time access link has self-destructed after initial use.' }, { status: 410 });
+    }
+
     if (link.expiresAt && new Date(link.expiresAt).getTime() < Date.now()) {
       return NextResponse.json({ error: 'Share link has expired' }, { status: 410 });
     }
@@ -71,6 +75,7 @@ export async function GET(
         passwordRequired: true,
         label: link.label,
         itemType: link.itemType,
+        oneTimeOnly: link.oneTimeOnly,
         error: isIncorrectPassword ? 'Incorrect password. Please try again.' : undefined,
       }, { status: isIncorrectPassword ? 401 : 200 });
     }
@@ -84,6 +89,7 @@ export async function GET(
       return NextResponse.json({
         passwordRequired: false,
         allowDownload: link.allowDownload,
+        oneTimeOnly: link.oneTimeOnly,
         itemType: 'file',
         file,
       });
@@ -108,6 +114,7 @@ export async function GET(
       return NextResponse.json({
         passwordRequired: false,
         allowDownload: link.allowDownload,
+        oneTimeOnly: link.oneTimeOnly,
         itemType: 'folder',
         folder: activeFolder,
         rootFolder: rootFolder,
@@ -156,6 +163,11 @@ export async function POST(
 
     const link = shares[linkIndex];
 
+    // Check self-destruct state
+    if (link.oneTimeOnly && link.selfDestructed) {
+      return NextResponse.json({ error: 'This one-time link has self-destructed.' }, { status: 410 });
+    }
+
     // Expiration check
     if (link.expiresAt && new Date(link.expiresAt).getTime() < Date.now()) {
       return NextResponse.json({ error: 'Share link has expired' }, { status: 410 });
@@ -166,17 +178,21 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid password', passwordRequired: true }, { status: 401 });
     }
 
-    // Increment metrics based on action
+    // Increment metrics & set selfDestructed flag if oneTimeOnly
     const updatedShares = [...shares];
+    const isSelfDestruct = Boolean(link.oneTimeOnly);
+
     if (action === 'download') {
       updatedShares[linkIndex] = {
         ...link,
         downloadsCount: (link.downloadsCount || 0) + 1,
+        selfDestructed: isSelfDestruct ? true : link.selfDestructed,
       };
     } else {
       updatedShares[linkIndex] = {
         ...link,
         viewsCount: (link.viewsCount || 0) + 1,
+        selfDestructed: isSelfDestruct ? true : link.selfDestructed,
       };
     }
 

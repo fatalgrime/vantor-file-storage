@@ -44,6 +44,7 @@ export default function PublicSharePage() {
   // Share link meta
   const [linkLabel, setLinkLabel] = useState('');
   const [allowDownload, setAllowDownload] = useState(true);
+  const [isOneTimeOnly, setIsOneTimeOnly] = useState(false);
   const [itemType, setItemType] = useState<'file' | 'folder'>('file');
 
   // Payload data
@@ -77,6 +78,7 @@ export default function PublicSharePage() {
         setPasswordRequired(true);
         setLinkLabel(data.label || 'Secure Link');
         setItemType(data.itemType);
+        setIsOneTimeOnly(Boolean(data.oneTimeOnly));
         if (enteredPassword || !res.ok || data?.error) {
           const msg = data?.error || 'Incorrect password. Please try again.';
           setAuthError(msg);
@@ -99,6 +101,7 @@ export default function PublicSharePage() {
       setErrorMsg('');
       setPasswordRequired(false);
       setAllowDownload(data.allowDownload);
+      setIsOneTimeOnly(Boolean(data.oneTimeOnly));
       setItemType(data.itemType);
 
       if (data.itemType === 'file') {
@@ -310,6 +313,18 @@ export default function PublicSharePage() {
 
       {/* Main Container */}
       <main className="flex-grow max-w-5xl w-full mx-auto px-4 py-8 flex flex-col items-center">
+        {isOneTimeOnly && (
+          <div className="w-full max-w-3xl mb-6 rounded-xl border border-rose-800/80 bg-rose-950/40 p-4 text-center shadow-lg shadow-rose-950/20">
+            <div className="flex items-center justify-center space-x-2 text-rose-300 font-bold text-xs uppercase tracking-wide">
+              <span className="text-sm">🔥</span>
+              <span>One-Time Self-Destruct Link</span>
+            </div>
+            <p className="mt-1 text-xs text-rose-200/80">
+              This link is single-use only. Accessing or downloading this asset will permanently burn and destroy this access link.
+            </p>
+          </div>
+        )}
+
         {itemType === 'file' && fileData && (
           <div className="w-full max-w-3xl space-y-5 text-center">
             {/* Header info */}

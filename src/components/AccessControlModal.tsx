@@ -64,6 +64,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
   // Link Generation Form States
   const [linkLabel, setLinkLabel] = useState('');
   const [allowDownload, setAllowDownload] = useState(true);
+  const [oneTimeOnly, setOneTimeOnly] = useState(false);
   const [usePassword, setUsePassword] = useState(false);
   const [password, setPassword] = useState('');
   const [expirationType, setExpirationType] = useState<'never' | '1h' | '1d' | '7d' | '30d' | 'custom'>('never');
@@ -137,6 +138,8 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
       label: linkLabel.trim() || `${isFolder ? 'Folder' : 'File'} Share Link`,
       permission: allowDownload ? 'edit' : 'view',
       allowDownload,
+      oneTimeOnly,
+      selfDestructed: false,
       password: usePassword && password ? password : undefined,
       expiresAt,
       createdAt: new Date().toISOString(),
@@ -149,12 +152,13 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
     addToast({
       type: 'success',
       title: 'Share link generated',
-      message: `Created secure share link "${newLink.label}".`,
+      message: `Created ${oneTimeOnly ? 'one-time self-destruct ' : ''}share link "${newLink.label}".`,
     });
 
     // Reset Form
     setLinkLabel('');
     setAllowDownload(true);
+    setOneTimeOnly(false);
     setUsePassword(false);
     setPassword('');
     setExpirationType('never');
@@ -498,17 +502,36 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                   </div>
                 )}
 
-                {/* Password Protection */}
+                {/* Security options: One-Time Self-Destruct & Password Protection */}
                 <div className="space-y-3 pt-3 border-t border-slate-800/80">
-                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={usePassword}
-                      onChange={(e) => setUsePassword(e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                    />
-                    <span className="text-xs font-semibold text-slate-200">Enable Passcode Security</span>
-                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#060a17] px-3 py-2 cursor-pointer hover:border-slate-700 transition-colors">
+                      <span className="text-xs font-semibold text-slate-200 flex items-center space-x-1.5">
+                        <span className="text-rose-400 font-bold">🔥</span>
+                        <span>One-Time Self-Destruct</span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={oneTimeOnly}
+                        onChange={(e) => setOneTimeOnly(e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#060a17] px-3 py-2 cursor-pointer hover:border-slate-700 transition-colors">
+                      <span className="text-xs font-semibold text-slate-200 flex items-center space-x-1.5">
+                        <Key className="h-3.5 w-3.5 text-amber-400" />
+                        <span>Enable Passcode Security</span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={usePassword}
+                        onChange={(e) => setUsePassword(e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </label>
+                  </div>
+
                   {usePassword && (
                     <div className="relative">
                       <Key className="absolute left-3 top-2.5 h-3.5 w-3.5 text-amber-400" />
@@ -547,12 +570,15 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                 ) : (
                   <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
                     {activeShares.map((link) => {
-                      const isExpired = link.expiresAt && new Date(link.expiresAt).getTime() < Date.now();
+                      const isExpired = (link.expiresAt && new Date(link.expiresAt).getTime() < Date.now()) || (link.oneTimeOnly && link.selfDestructed);
                       return (
                         <div key={link.id} className="p-3.5 bg-[#090f22]/80 border border-slate-800 rounded-xl flex flex-col space-y-2.5 shadow-md">
                           <div className="flex items-center justify-between">
                             <div>
-                              <span className="font-bold text-white text-xs">{link.label}</span>
+                              <span className="font-bold text-white text-xs flex items-center space-x-1.5">
+                                {link.oneTimeOnly && <span title="One-Time Self-Destruct Link">🔥</span>}
+                                <span>{link.label}</span>
+                              </span>
                               <div className="flex items-center space-x-3 mt-1 text-[11px] text-slate-400">
                                 <span className="flex items-center"><Eye className="h-3 w-3 mr-1 text-blue-400" /> {link.viewsCount} views</span>
                                 {link.allowDownload && (
@@ -579,6 +605,15 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2 text-[10px]">
+                            {link.oneTimeOnly && (
+                              <span className={`px-2 py-0.5 rounded-md font-medium flex items-center ${link.selfDestructed
+                                ? 'bg-red-950 border border-red-900 text-red-400 line-through'
+                                : 'bg-rose-950/90 border border-rose-800 text-rose-300'
+                                }`}>
+                                <span className="mr-1">🔥</span>
+                                {link.selfDestructed ? 'Self-Destructed (Used)' : 'One-Time Link'}
+                              </span>
+                            )}
                             {link.password && (
                               <span className="px-2 py-0.5 rounded-md bg-amber-950/80 border border-amber-800/80 text-amber-300 font-medium flex items-center">
                                 <Key className="h-2.5 w-2.5 mr-1" /> Password Protected

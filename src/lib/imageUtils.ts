@@ -85,58 +85,7 @@ export function resolveImageSrc(file: Partial<VantorFile> | null | undefined): s
   return '';
 }
 
-/**
- * Analyzes the visual pixel density of an image element.
- * Returns 180 if bottom region has significantly higher text/content density than top region (upside-down document).
- */
-export function detectVisualImageOrientation(img: HTMLImageElement): number {
-  try {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return 0;
 
-    const width = img.naturalWidth || img.width;
-    const height = img.naturalHeight || img.height;
-    if (width <= 0 || height <= 0) return 0;
-
-    canvas.width = Math.min(600, width);
-    canvas.height = Math.min(800, height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    const marginX = Math.floor(canvas.width * 0.1);
-    const sampleWidth = canvas.width - (marginX * 2);
-    const sampleHeight = Math.floor(canvas.height * 0.35);
-
-    if (sampleWidth <= 0 || sampleHeight <= 0) return 0;
-
-    const topData = ctx.getImageData(marginX, marginX, sampleWidth, sampleHeight).data;
-    const bottomData = ctx.getImageData(marginX, canvas.height - sampleHeight - marginX, sampleWidth, sampleHeight).data;
-
-    let topDark = 0;
-    let bottomDark = 0;
-
-    for (let i = 0; i < topData.length; i += 16) {
-      if (topData[i + 3] > 50) {
-        const lum = 0.299 * topData[i] + 0.587 * topData[i + 1] + 0.114 * topData[i + 2];
-        if (lum < 210) topDark++;
-      }
-    }
-
-    for (let i = 0; i < bottomData.length; i += 16) {
-      if (bottomData[i + 3] > 50) {
-        const lum = 0.299 * bottomData[i] + 0.587 * bottomData[i + 1] + 0.114 * bottomData[i + 2];
-        if (lum < 210) bottomDark++;
-      }
-    }
-
-    if (bottomDark > 40 && bottomDark > topDark * 1.35) {
-      return 180;
-    }
-  } catch (err) {
-    console.warn('Visual orientation check warning:', err);
-  }
-  return 0;
-}
 
 /**
  * Normalizes an image's EXIF orientation by physically rotating/transforming
@@ -172,6 +121,10 @@ export async function normalizeImageOrientation(
 
     let orientation = arrayBuffer ? getExifOrientation(arrayBuffer) : 1;
 
+    if (orientation <= 1) {
+      return imageSrc; // Already upright (Standard EXIF 1)
+    }
+
     const img = new Image();
     img.crossOrigin = 'anonymous';
 
@@ -180,15 +133,6 @@ export async function normalizeImageOrientation(
       img.onerror = (e) => reject(e);
       img.src = imageSrc;
     });
-
-    if (orientation <= 1) {
-      const visualRot = detectVisualImageOrientation(img);
-      if (visualRot === 180) {
-        orientation = 3; // 180° rotation
-      } else {
-        return imageSrc; // Already upright
-      }
-    }
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
