@@ -148,6 +148,55 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
     return 0;
   }
 
+  /**
+   * Analyzes the rendered canvas pixel density to detect if bottom half contains heavy header content while top half is sparse (upside-down scanned document).
+   */
+  function detectCanvasVisualOrientation(canvas: HTMLCanvasElement): number {
+    try {
+      const ctx = canvas.getContext('2d');
+      if (!ctx || canvas.width === 0 || canvas.height === 0) return 0;
+
+      const width = canvas.width;
+      const height = canvas.height;
+      const marginX = Math.floor(width * 0.1);
+      const sampleWidth = width - (marginX * 2);
+      const sampleHeight = Math.floor(height * 0.35);
+
+      if (sampleWidth <= 0 || sampleHeight <= 0) return 0;
+
+      const topImageData = ctx.getImageData(marginX, marginX, sampleWidth, sampleHeight);
+      const bottomImageData = ctx.getImageData(marginX, height - sampleHeight - marginX, sampleWidth, sampleHeight);
+
+      let topDarkPixels = 0;
+      let bottomDarkPixels = 0;
+
+      const topPixels = topImageData.data;
+      for (let i = 0; i < topPixels.length; i += 16) {
+        const a = topPixels[i + 3];
+        if (a > 50) {
+          const lum = 0.299 * topPixels[i] + 0.587 * topPixels[i + 1] + 0.114 * topPixels[i + 2];
+          if (lum < 210) topDarkPixels++;
+        }
+      }
+
+      const bottomPixels = bottomImageData.data;
+      for (let i = 0; i < bottomPixels.length; i += 16) {
+        const a = bottomPixels[i + 3];
+        if (a > 50) {
+          const lum = 0.299 * bottomPixels[i] + 0.587 * bottomPixels[i + 1] + 0.114 * bottomPixels[i + 2];
+          if (lum < 210) bottomDarkPixels++;
+        }
+      }
+
+      if (bottomDarkPixels > 40 && bottomDarkPixels > topDarkPixels * 1.35) {
+        return 180;
+      }
+    } catch (err) {
+      console.warn('Canvas visual orientation check error:', err);
+    }
+    return 0;
+  }
+
   // Handle rendering a page
   const renderPage = async (pageNumber: number, currentScale: number, fitWidth: boolean, currentRotation: number) => {
     if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
@@ -193,6 +242,25 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
       };
 
       await page.render(renderContext).promise;
+
+      // Check visual pixel density for scanned upside-down PDFs
+      if (autoRot === 0 && nativeRotate === 0) {
+        const visualAngle = detectCanvasVisualOrientation(canvas);
+        if (visualAngle === 180) {
+          const correctedRotation = (nativeRotate + 180 + currentRotation) % 360;
+          const correctedViewport = page.getViewport({ scale: finalScale * pixelRatio, rotation: correctedRotation });
+          canvas.height = correctedViewport.height;
+          canvas.width = correctedViewport.width;
+          canvas.style.width = `${correctedViewport.width / pixelRatio}px`;
+          canvas.style.height = `${correctedViewport.height / pixelRatio}px`;
+
+          await page.render({
+            canvasContext: context,
+            viewport: correctedViewport,
+          }).promise;
+        }
+      }
+
       setPageRendering(false);
     } catch (err) {
       console.error('Page render error:', err);
