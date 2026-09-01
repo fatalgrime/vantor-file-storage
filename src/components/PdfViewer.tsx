@@ -25,6 +25,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
   const [totalPages, setTotalPages] = useState<number>(0);
   const [scale, setScale] = useState<number>(1.0);
   const [rotation, setRotation] = useState<number>(0);
+  const [autoRotation, setAutoRotation] = useState<number>(0);
   const [isFitWidth, setIsFitWidth] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string>('');
@@ -95,6 +96,25 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
         setPdfDoc(doc);
         setTotalPages(doc.numPages);
         setCurrentPage(1);
+
+        // Pre-detect page orientation offscreen before unveiling canvas
+        try {
+          const page1 = await doc.getPage(1);
+          const nativeRot = page1.rotate || 0;
+          let detectedRot = 0;
+          if (nativeRot === 0) {
+            detectedRot = await detectPdfPageOrientation(page1);
+            if (detectedRot === 0) {
+              detectedRot = await detectOffscreenVisualOrientation(page1, nativeRot);
+            }
+          }
+          if (active && detectedRot !== 0) {
+            setAutoRotation(detectedRot);
+          }
+        } catch (e) {
+          console.warn('Pre-detect orientation warning:', e);
+        }
+
         setLoading(false);
       } catch (err: any) {
         console.error('PDF Load Error:', err);
@@ -197,9 +217,45 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
     return 0;
   }
 
+  /**
+   * Renders an offscreen thumbnail canvas to detect visual orientation before DOM layout settles.
+   */
+  async function detectOffscreenVisualOrientation(page: any, nativeRotate: number): Promise<number> {
+    try {
+      const viewport = page.getViewport({ scale: 0.5, rotation: nativeRotate });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return 0;
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      return detectCanvasVisualOrientation(canvas);
+    } catch (err) {
+      console.warn('Offscreen visual orientation check error:', err);
+      return 0;
+    }
+  }
+
   // Handle rendering a page
-  const renderPage = async (pageNumber: number, currentScale: number, fitWidth: boolean, currentRotation: number) => {
+  const renderPage = async (
+    pageNumber: number,
+    currentScale: number,
+    fitWidth: boolean,
+    currentRotation: number,
+    currentAutoRot: number
+  ) => {
     if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
+
+    // Guard: Wait for DOM container layout settling before calculating fitWidth
+    if (fitWidth && containerRef.current.clientWidth < 150) {
+      requestAnimationFrame(() => {
+        if (containerRef.current && containerRef.current.clientWidth >= 150) {
+          renderPage(pageNumber, currentScale, fitWidth, currentRotation, currentAutoRot);
+        }
+      });
+      return;
+    }
 
     try {
       setPageRendering(true);
@@ -207,9 +263,9 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
 
       let finalScale = currentScale;
       const nativeRotate = page.rotate || 0;
-      let autoRot = 0;
+      let autoRot = currentAutoRot;
 
-      if (nativeRotate === 0) {
+      if (nativeRotate === 0 && autoRot === 0) {
         autoRot = await detectPdfPageOrientation(page);
       }
 
@@ -243,10 +299,11 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
 
       await page.render(renderContext).promise;
 
-      // Check visual pixel density for scanned upside-down PDFs
+      // Secondary check: if autoRot was 0, check visual density on rendered canvas
       if (autoRot === 0 && nativeRotate === 0) {
         const visualAngle = detectCanvasVisualOrientation(canvas);
         if (visualAngle === 180) {
+          setAutoRotation(180);
           const correctedRotation = (nativeRotate + 180 + currentRotation) % 360;
           const correctedViewport = page.getViewport({ scale: finalScale * pixelRatio, rotation: correctedRotation });
           canvas.height = correctedViewport.height;
@@ -268,24 +325,28 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
     }
   };
 
-  // Re-render page when PDF, page index, scale, or rotation changes
+  // Re-render page when PDF, page index, scale, rotation, or autoRotation changes
   useEffect(() => {
     if (pdfDoc) {
-      renderPage(currentPage, scale, isFitWidth, rotation);
+      renderPage(currentPage, scale, isFitWidth, rotation, autoRotation);
     }
-  }, [pdfDoc, currentPage, scale, isFitWidth, rotation]);
+  }, [pdfDoc, currentPage, scale, isFitWidth, rotation, autoRotation]);
 
-  // Adjust zoom on container resize if isFitWidth is active
+  // Adjust zoom on container resize when container layout settles
   useEffect(() => {
-    const handleResize = () => {
-      if (isFitWidth && pdfDoc) {
-        renderPage(currentPage, scale, true, rotation);
-      }
-    };
+    if (!containerRef.current) return;
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [pdfDoc, currentPage, scale, isFitWidth, rotation]);
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 150 && pdfDoc) {
+          renderPage(currentPage, scale, isFitWidth, rotation, autoRotation);
+        }
+      }
+    });
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [pdfDoc, currentPage, scale, isFitWidth, rotation, autoRotation]);
 
   const handlePrevPage = () => {
     if (currentPage > 1) {
