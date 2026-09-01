@@ -130,7 +130,8 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
         }
       }
 
-      const viewport = page.getViewport({ scale: finalScale });
+      const pixelRatio = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+      const viewport = page.getViewport({ scale: finalScale * pixelRatio });
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
 
@@ -138,6 +139,8 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
 
       canvas.height = viewport.height;
       canvas.width = viewport.width;
+      canvas.style.width = `${viewport.width / pixelRatio}px`;
+      canvas.style.height = `${viewport.height / pixelRatio}px`;
 
       const renderContext = {
         canvasContext: context,

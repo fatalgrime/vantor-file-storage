@@ -74,9 +74,12 @@ export default function PublicSharePage() {
   // Preview Modal for Folder Browser
   const [previewFile, setPreviewFile] = useState<VantorFile | null>(null);
 
-  // General Viewer States
+  // General Viewer States & Zoom/Pan
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Audio Player States
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -218,6 +221,10 @@ export default function PublicSharePage() {
       return;
     }
 
+    setZoom(1);
+    setRotation(0);
+    setPan({ x: 0, y: 0 });
+
     const isImage = activeImageFile.mimeType.startsWith('image/') ||
       ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(activeImageFile.extension);
 
@@ -250,6 +257,52 @@ export default function PublicSharePage() {
       active = false;
     };
   }, [activeImageFile?.id, activeImageFile?.content, activeImageFile?.url]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoom <= 1 && rotation === 0) return;
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    setPan({
+      x: e.clientX - dragStartRef.current.x,
+      y: e.clientY - dragStartRef.current.y,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 0.15 : -0.15;
+    setZoom((prevZoom) => {
+      const nextZoom = Math.min(4.0, Math.max(0.25, parseFloat((prevZoom + delta).toFixed(2))));
+      if (nextZoom <= 1 && prevZoom > 1) {
+        setPan({ x: 0, y: 0 });
+      }
+      return nextZoom;
+    });
+  };
+
+  const handleDoubleClick = () => {
+    if (zoom !== 1 || pan.x !== 0 || pan.y !== 0) {
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+    } else {
+      setZoom(2);
+    }
+  };
+
+  const handleResetZoomPan = () => {
+    setZoom(1);
+    setRotation(0);
+    setPan({ x: 0, y: 0 });
+  };
 
   // Clean up Media URLs on unmount
   useEffect(() => {
@@ -559,19 +612,31 @@ export default function PublicSharePage() {
         <div className="flex flex-col space-y-4 items-center w-full">
           <div className="flex items-center space-x-3 bg-slate-900 border border-slate-800 rounded-lg px-4 py-1.5 text-xs text-slate-300">
             <button
-              onClick={() => setZoom(z => Math.max(0.25, z - 0.25))}
+              onClick={() => {
+                setZoom(z => {
+                  const next = Math.max(0.25, z - 0.25);
+                  if (next <= 1) setPan({ x: 0, y: 0 });
+                  return next;
+                });
+              }}
               disabled={zoom <= 0.25}
               className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              title="Zoom Out"
+              title="Zoom Out (-)"
             >
               <ZoomOut className="h-4 w-4" />
             </button>
-            <span className="font-mono min-w-[48px] text-center">{Math.round(zoom * 100)}%</span>
             <button
-              onClick={() => setZoom(z => Math.min(3, z + 0.25))}
-              disabled={zoom >= 3.0}
+              onClick={handleResetZoomPan}
+              className="font-mono min-w-[52px] text-center hover:text-blue-400 transition-colors px-1 py-0.5 rounded hover:bg-slate-800/60"
+              title="Click to reset zoom & rotation"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              onClick={() => setZoom(z => Math.min(4.0, z + 0.25))}
+              disabled={zoom >= 4.0}
               className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              title="Zoom In"
+              title="Zoom In (+)"
             >
               <ZoomIn className="h-4 w-4" />
             </button>
@@ -583,14 +648,23 @@ export default function PublicSharePage() {
               <RotateCw className="h-4 w-4" />
             </button>
             <button
-              onClick={() => { setZoom(1); setRotation(0); }}
+              onClick={handleResetZoomPan}
               className="p-1 hover:bg-slate-800 rounded text-[10px] text-slate-400 hover:text-white font-semibold transition-colors"
             >
               Reset
             </button>
           </div>
 
-          <div className="w-full flex items-center justify-center p-6 bg-slate-950/60 rounded-xl border border-slate-800 overflow-auto max-h-[50vh] min-h-[250px] relative">
+          <div
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onWheel={handleWheel}
+            className={`w-full flex items-center justify-center p-6 bg-slate-950/60 rounded-xl border border-slate-800 overflow-hidden max-h-[55vh] relative min-h-[280px] select-none ${
+              zoom > 1 || rotation !== 0 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
+            }`}
+          >
             <div
               className="absolute inset-0 opacity-[0.03] pointer-events-none"
               style={{
@@ -604,12 +678,23 @@ export default function PublicSharePage() {
                 <span className="text-xs font-mono">Orienting image preview...</span>
               </div>
             ) : (
-              <img
-                src={imageSrc}
-                alt={file.name}
-                className="max-w-full max-h-[45vh] object-contain rounded shadow-lg transition-transform duration-250 ease-out"
-                style={{ transform: `scale(${zoom}) rotate(${rotation}deg)`, imageOrientation: 'none' }}
-              />
+              <div
+                className="transition-transform duration-150 ease-out flex items-center justify-center m-auto"
+                style={{
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom}) rotate(${rotation}deg)`,
+                  transformOrigin: 'center center',
+                  willChange: 'transform',
+                }}
+              >
+                <img
+                  src={imageSrc}
+                  alt={file.name}
+                  onDoubleClick={handleDoubleClick}
+                  className="max-w-full max-h-[48vh] object-contain rounded shadow-lg pointer-events-auto"
+                  style={{ imageOrientation: 'none' }}
+                  title="Double-click to toggle 2x zoom"
+                />
+              </div>
             )}
           </div>
         </div>
