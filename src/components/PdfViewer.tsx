@@ -97,22 +97,18 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
         setTotalPages(doc.numPages);
         setCurrentPage(1);
 
-        // Pre-detect page orientation offscreen before unveiling canvas
+        // Pre-check text orientation on page 1
         try {
           const page1 = await doc.getPage(1);
           const nativeRot = page1.rotate || 0;
-          let detectedRot = 0;
           if (nativeRot === 0) {
-            detectedRot = await detectPdfPageOrientation(page1);
-            if (detectedRot === 0) {
-              detectedRot = await detectOffscreenVisualOrientation(page1, nativeRot);
+            const textRot = await detectPdfPageOrientation(page1);
+            if (textRot !== 0 && active) {
+              setAutoRotation(textRot);
             }
           }
-          if (active && detectedRot !== 0) {
-            setAutoRotation(detectedRot);
-          }
         } catch (e) {
-          console.warn('Pre-detect orientation warning:', e);
+          console.warn('Pre-check orientation warning:', e);
         }
 
         setLoading(false);
@@ -217,26 +213,6 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
     return 0;
   }
 
-  /**
-   * Renders an offscreen thumbnail canvas to detect visual orientation before DOM layout settles.
-   */
-  async function detectOffscreenVisualOrientation(page: any, nativeRotate: number): Promise<number> {
-    try {
-      const viewport = page.getViewport({ scale: 0.5, rotation: nativeRotate });
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return 0;
-
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      return detectCanvasVisualOrientation(canvas);
-    } catch (err) {
-      console.warn('Offscreen visual orientation check error:', err);
-      return 0;
-    }
-  }
-
   // Handle rendering a page
   const renderPage = async (
     pageNumber: number,
@@ -246,16 +222,6 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
     currentAutoRot: number
   ) => {
     if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
-
-    // Guard: Wait for DOM container layout settling before calculating fitWidth
-    if (fitWidth && containerRef.current.clientWidth < 150) {
-      requestAnimationFrame(() => {
-        if (containerRef.current && containerRef.current.clientWidth >= 150) {
-          renderPage(pageNumber, currentScale, fitWidth, currentRotation, currentAutoRot);
-        }
-      });
-      return;
-    }
 
     try {
       setPageRendering(true);
@@ -272,7 +238,8 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
       const totalRotation = (nativeRotate + autoRot + currentRotation) % 360;
 
       if (fitWidth) {
-        const containerWidth = Math.max(100, containerRef.current.clientWidth - 40); // Subtract padding
+        const measuredWidth = containerRef.current.clientWidth;
+        const containerWidth = measuredWidth > 0 ? Math.max(200, measuredWidth - 40) : 600;
         const unscaledViewport = page.getViewport({ scale: 1.0, rotation: totalRotation });
         if (unscaledViewport.width > 0) {
           finalScale = containerWidth / unscaledViewport.width;
@@ -299,22 +266,11 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
 
       await page.render(renderContext).promise;
 
-      // Secondary check: if autoRot was 0, check visual density on rendered canvas
+      // Post-render visual density check for scanned upside-down PDFs
       if (autoRot === 0 && nativeRotate === 0) {
         const visualAngle = detectCanvasVisualOrientation(canvas);
         if (visualAngle === 180) {
           setAutoRotation(180);
-          const correctedRotation = (nativeRotate + 180 + currentRotation) % 360;
-          const correctedViewport = page.getViewport({ scale: finalScale * pixelRatio, rotation: correctedRotation });
-          canvas.height = correctedViewport.height;
-          canvas.width = correctedViewport.width;
-          canvas.style.width = `${correctedViewport.width / pixelRatio}px`;
-          canvas.style.height = `${correctedViewport.height / pixelRatio}px`;
-
-          await page.render({
-            canvasContext: context,
-            viewport: correctedViewport,
-          }).promise;
         }
       }
 
