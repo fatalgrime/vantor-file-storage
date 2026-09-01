@@ -32,11 +32,13 @@ import {
   Check,
   Copy,
   ChevronRight as ChevronRightIcon,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { VantorFile, VantorFolder, ShareLink } from '../../../lib/types';
 import { PdfViewer } from '../../../components/PdfViewer';
 import { useToast } from '../../../components/ToastProvider';
+import { resolveImageSrc, normalizeImageOrientation } from '../../../lib/imageUtils';
 
 export default function PublicSharePage() {
   const params = useParams();
@@ -92,6 +94,10 @@ export default function PublicSharePage() {
 
   // Code Copy State
   const [codeCopied, setCodeCopied] = useState(false);
+
+  // Image Viewer Normalization States
+  const [displayImageSrc, setDisplayImageSrc] = useState<string>('');
+  const [imageLoading, setImageLoading] = useState<boolean>(false);
 
   // Fetch initial details
   const fetchShareData = async (enteredPassword?: string, subfolderId?: string) => {
@@ -203,6 +209,48 @@ export default function PublicSharePage() {
     }
   }, [shareId]);
 
+  // Normalize image orientation when viewing a shared file or modal file
+  const activeImageFile = itemType === 'file' ? fileData : previewFile;
+
+  useEffect(() => {
+    if (!activeImageFile) {
+      setDisplayImageSrc('');
+      return;
+    }
+
+    const isImage = activeImageFile.mimeType.startsWith('image/') ||
+      ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(activeImageFile.extension);
+
+    if (!isImage) {
+      setDisplayImageSrc('');
+      return;
+    }
+
+    let active = true;
+    const rawSrc = resolveImageSrc(activeImageFile);
+
+    if (rawSrc) {
+      setImageLoading(true);
+      normalizeImageOrientation(rawSrc, activeImageFile.mimeType)
+        .then((normalized) => {
+          if (active) {
+            setDisplayImageSrc(normalized);
+            setImageLoading(false);
+          }
+        })
+        .catch(() => {
+          if (active) {
+            setDisplayImageSrc(rawSrc);
+            setImageLoading(false);
+          }
+        });
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [activeImageFile?.id, activeImageFile?.content, activeImageFile?.url]);
+
   // Clean up Media URLs on unmount
   useEffect(() => {
     return () => {
@@ -242,14 +290,21 @@ export default function PublicSharePage() {
       }).catch(e => console.error("Metrics download error", e));
 
       // Initiate download
-      const isDataUrl = fileToDownload.content?.startsWith('data:');
       let dlUrl = '';
+      let isTempBlob = false;
 
-      if (isDataUrl) {
-        dlUrl = fileToDownload.content!;
-      } else {
-        const blob = new Blob([fileToDownload.content || fileToDownload.description], { type: fileToDownload.mimeType });
+      if (fileToDownload.content?.startsWith('data:')) {
+        dlUrl = fileToDownload.content;
+      } else if (fileToDownload.url) {
+        dlUrl = fileToDownload.url;
+      } else if (fileToDownload.content) {
+        const blob = new Blob([fileToDownload.content], { type: fileToDownload.mimeType });
         dlUrl = URL.createObjectURL(blob);
+        isTempBlob = true;
+      } else {
+        const blob = new Blob([fileToDownload.description || ''], { type: fileToDownload.mimeType || 'text/plain' });
+        dlUrl = URL.createObjectURL(blob);
+        isTempBlob = true;
       }
 
       const a = document.createElement('a');
@@ -259,8 +314,8 @@ export default function PublicSharePage() {
       a.click();
       document.body.removeChild(a);
 
-      if (!isDataUrl) {
-        URL.revokeObjectURL(dlUrl);
+      if (isTempBlob) {
+        setTimeout(() => URL.revokeObjectURL(dlUrl), 1000);
       }
     } catch (err) {
       console.error("Download failed", err);
@@ -413,13 +468,14 @@ export default function PublicSharePage() {
     if (lines.length === 0) return { headers: [], rows: [] };
 
     const parseLine = (line: string) => {
+      const cleanLine = line.replace(/\r$/, '');
       const result = [];
       let current = '';
       let inQuotes = false;
       const delimiter = fileData?.extension === 'tsv' ? '\t' : ',';
 
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
+      for (let i = 0; i < cleanLine.length; i++) {
+        const char = cleanLine[i];
         if (char === '"') {
           inQuotes = !inQuotes;
         } else if (char === delimiter && !inQuotes) {
@@ -459,27 +515,28 @@ export default function PublicSharePage() {
       let inSingleQuote = false;
 
       const lineSpan = words.map((token, wIdx) => {
+        const tokenKey = `${idx}-${wIdx}`;
         if (token === '"') {
           inDoubleQuote = !inDoubleQuote;
-          return <span key={wIdx} className="text-emerald-400">"</span>;
+          return <span key={tokenKey} className="text-emerald-400">"</span>;
         }
         if (token === "'") {
           inSingleQuote = !inSingleQuote;
-          return <span key={wIdx} className="text-emerald-400">'</span>;
+          return <span key={tokenKey} className="text-emerald-400">'</span>;
         }
         if (inDoubleQuote || inSingleQuote) {
-          return <span key={wIdx} className="text-emerald-400">{token}</span>;
+          return <span key={tokenKey} className="text-emerald-400">{token}</span>;
         }
         if (keywords.includes(token)) {
-          return <span key={wIdx} className="text-pink-500 font-semibold">{token}</span>;
+          return <span key={tokenKey} className="text-pink-500 font-semibold">{token}</span>;
         }
         if (/^\d+$/.test(token)) {
-          return <span key={wIdx} className="text-amber-400">{token}</span>;
+          return <span key={tokenKey} className="text-amber-400">{token}</span>;
         }
         if (['=', '+', '-', '*', '/', '==', '===', '!=', '!==', '<', '>', '&&', '||'].includes(token)) {
-          return <span key={wIdx} className="text-cyan-400">{token}</span>;
+          return <span key={tokenKey} className="text-cyan-400">{token}</span>;
         }
-        return <span key={wIdx}>{token}</span>;
+        return <span key={tokenKey}>{token}</span>;
       });
 
       return (
@@ -494,7 +551,10 @@ export default function PublicSharePage() {
   // Render individual file previews inside the Portal page
   const renderSharedFilePreview = (file: VantorFile) => {
     // 1. Image
-    if (file.mimeType.startsWith('image/') && file.content?.startsWith('data:')) {
+    const isImage = file.mimeType.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(file.extension);
+    const imageSrc = displayImageSrc || resolveImageSrc(file);
+
+    if (isImage && imageSrc) {
       return (
         <div className="flex flex-col space-y-4 items-center w-full">
           <div className="flex items-center space-x-3 bg-slate-900 border border-slate-800 rounded-lg px-4 py-1.5 text-xs text-slate-300">
@@ -538,12 +598,19 @@ export default function PublicSharePage() {
                 backgroundSize: '24px 24px'
               }}
             />
-            <img
-              src={file.content}
-              alt={file.name}
-              className="max-w-full max-h-[45vh] object-contain rounded shadow-lg transition-transform duration-250 ease-out"
-              style={{ transform: `scale(${zoom}) rotate(${rotation}deg)`, imageOrientation: 'from-image' }}
-            />
+            {imageLoading ? (
+              <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-500 mb-2" />
+                <span className="text-xs font-mono">Orienting image preview...</span>
+              </div>
+            ) : (
+              <img
+                src={imageSrc}
+                alt={file.name}
+                className="max-w-full max-h-[45vh] object-contain rounded shadow-lg transition-transform duration-250 ease-out"
+                style={{ transform: `scale(${zoom}) rotate(${rotation}deg)`, imageOrientation: 'none' }}
+              />
+            )}
           </div>
         </div>
       );

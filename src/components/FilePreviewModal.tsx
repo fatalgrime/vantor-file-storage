@@ -31,11 +31,13 @@ import {
   Music,
   Video,
   FileSpreadsheet,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react';
 import { VantorFile, UserRole, VantorFolder, VantorRepository } from '../lib/types';
 import { canReadItem, ALL_USER_ROLES } from '../lib/authorization';
 import { PdfViewer } from './PdfViewer';
+import { resolveImageSrc, normalizeImageOrientation } from '../lib/imageUtils';
 
 interface FilePreviewModalProps {
   file: VantorFile | null;
@@ -62,6 +64,8 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   // Image Viewer States
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const [displayImageSrc, setDisplayImageSrc] = useState<string>('');
+  const [imageLoading, setImageLoading] = useState<boolean>(false);
 
   // Audio Player States
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -81,7 +85,13 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   const [codeCopied, setCodeCopied] = useState(false);
 
   useEffect(() => {
-    if (!file) return;
+    if (!file) {
+      setDisplayImageSrc('');
+      setMediaUrl('');
+      return;
+    }
+
+    let isCancelled = false;
 
     // Reset states on file change
     setZoom(1);
@@ -92,10 +102,34 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     setCsvSearch('');
     setCsvPage(0);
     setCodeCopied(false);
+    setDisplayImageSrc('');
+
+    const isImage = file.mimeType.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(file.extension);
+
+    if (isImage) {
+      const rawSrc = resolveImageSrc(file);
+      if (rawSrc) {
+        setImageLoading(true);
+        normalizeImageOrientation(rawSrc, file.mimeType)
+          .then((normalized) => {
+            if (!isCancelled) {
+              setDisplayImageSrc(normalized);
+              setImageLoading(false);
+            }
+          })
+          .catch(() => {
+            if (!isCancelled) {
+              setDisplayImageSrc(rawSrc);
+              setImageLoading(false);
+            }
+          });
+      }
+    }
 
     const isAudio = file.mimeType.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(file.extension);
     const isVideo = file.mimeType.startsWith('video/') || ['mp4', 'webm', 'ogg', 'mov', 'm4v'].includes(file.extension);
 
+    let createdBlobUrl = '';
     if (isAudio || isVideo) {
       let url = '';
       if (file.content) {
@@ -111,21 +145,25 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
             }
             const blob = new Blob([bytes], { type: file.mimeType });
             url = URL.createObjectURL(blob);
+            createdBlobUrl = url;
           } catch {
             const blob = new Blob([file.content], { type: file.mimeType });
             url = URL.createObjectURL(blob);
+            createdBlobUrl = url;
           }
         }
       } else if (file.url) {
         url = file.url;
       }
       setMediaUrl(url);
-      return () => {
-        if (url && url.startsWith('blob:')) {
-          URL.revokeObjectURL(url);
-        }
-      };
     }
+
+    return () => {
+      isCancelled = true;
+      if (createdBlobUrl) {
+        URL.revokeObjectURL(createdBlobUrl);
+      }
+    };
   }, [file]);
 
   if (!file) return null;
@@ -202,13 +240,14 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     if (lines.length === 0) return { headers: [], rows: [] };
 
     const parseLine = (line: string) => {
+      const cleanLine = line.replace(/\r$/, '');
       const result = [];
       let current = '';
       let inQuotes = false;
       const delimiter = file.extension === 'tsv' ? '\t' : ',';
 
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
+      for (let i = 0; i < cleanLine.length; i++) {
+        const char = cleanLine[i];
         if (char === '"') {
           inQuotes = !inQuotes;
         } else if (char === delimiter && !inQuotes) {
@@ -248,27 +287,28 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
       let inSingleQuote = false;
 
       const lineSpan = words.map((token, wIdx) => {
+        const tokenKey = `${idx}-${wIdx}`;
         if (token === '"') {
           inDoubleQuote = !inDoubleQuote;
-          return <span key={wIdx} className="text-emerald-400">"</span>;
+          return <span key={tokenKey} className="text-emerald-400">"</span>;
         }
         if (token === "'") {
           inSingleQuote = !inSingleQuote;
-          return <span key={wIdx} className="text-emerald-400">'</span>;
+          return <span key={tokenKey} className="text-emerald-400">'</span>;
         }
         if (inDoubleQuote || inSingleQuote) {
-          return <span key={wIdx} className="text-emerald-400">{token}</span>;
+          return <span key={tokenKey} className="text-emerald-400">{token}</span>;
         }
         if (keywords.includes(token)) {
-          return <span key={wIdx} className="text-pink-500 font-semibold">{token}</span>;
+          return <span key={tokenKey} className="text-pink-500 font-semibold">{token}</span>;
         }
         if (/^\d+$/.test(token)) {
-          return <span key={wIdx} className="text-amber-400">{token}</span>;
+          return <span key={tokenKey} className="text-amber-400">{token}</span>;
         }
         if (['=', '+', '-', '*', '/', '=>', '==', '===', '!=', '!==', '<', '>', '&&', '||'].includes(token)) {
-          return <span key={wIdx} className="text-cyan-400">{token}</span>;
+          return <span key={tokenKey} className="text-cyan-400">{token}</span>;
         }
-        return <span key={wIdx}>{token}</span>;
+        return <span key={tokenKey}>{token}</span>;
       });
 
       return (
@@ -423,9 +463,11 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   };
 
   const renderContentPreview = () => {
-    // 1. Image Viewer with Zoom / Rotate
-    const imageSrc = file.content?.startsWith('data:') ? file.content : file.url;
-    if (file.mimeType.startsWith('image/') && imageSrc) {
+    // 1. Image Viewer with Zoom / Rotate & Orientation Normalization
+    const isImage = file.mimeType.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(file.extension);
+    const imageSrc = displayImageSrc || resolveImageSrc(file);
+
+    if (isImage && imageSrc) {
       return (
         <div className="flex flex-col space-y-4 items-center w-full">
           {/* Controls Bar */}
@@ -472,12 +514,19 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                 backgroundSize: '24px 24px'
               }}
             />
-            <img
-              src={imageSrc}
-              alt={file.name}
-              className="max-w-full max-h-[50vh] object-contain rounded shadow-lg transition-transform duration-250 ease-out"
-              style={{ transform: `scale(${zoom}) rotate(${rotation}deg)`, imageOrientation: 'from-image' }}
-            />
+            {imageLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-500 mb-2" />
+                <span className="text-xs font-mono">Orienting image preview...</span>
+              </div>
+            ) : (
+              <img
+                src={imageSrc}
+                alt={file.name}
+                className="max-w-full max-h-[50vh] object-contain rounded shadow-lg transition-transform duration-250 ease-out"
+                style={{ transform: `scale(${zoom}) rotate(${rotation}deg)`, imageOrientation: 'none' }}
+              />
+            )}
           </div>
         </div>
       );

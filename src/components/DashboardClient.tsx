@@ -654,14 +654,21 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     // Increment download count
     setFiles(nextFiles);
 
-    const isDataUrl = file.content?.startsWith('data:');
     let url = '';
+    let isTempBlob = false;
 
-    if (isDataUrl) {
-      url = file.content!;
-    } else {
-      const blob = new Blob([file.content || file.description], { type: file.mimeType });
+    if (file.content?.startsWith('data:')) {
+      url = file.content;
+    } else if (file.url) {
+      url = file.url;
+    } else if (file.content) {
+      const blob = new Blob([file.content], { type: file.mimeType });
       url = URL.createObjectURL(blob);
+      isTempBlob = true;
+    } else {
+      const blob = new Blob([file.description || ''], { type: file.mimeType || 'text/plain' });
+      url = URL.createObjectURL(blob);
+      isTempBlob = true;
     }
 
     const a = document.createElement('a');
@@ -671,8 +678,8 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     a.click();
     document.body.removeChild(a);
 
-    if (!isDataUrl) {
-      URL.revokeObjectURL(url);
+    if (isTempBlob) {
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     // Add Audit Log

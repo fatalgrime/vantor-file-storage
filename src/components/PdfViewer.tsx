@@ -122,10 +122,12 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
       let finalScale = currentScale;
 
       if (fitWidth) {
-        const containerWidth = containerRef.current.clientWidth - 40; // Subtract padding
+        const containerWidth = Math.max(100, containerRef.current.clientWidth - 40); // Subtract padding
         const unscaledViewport = page.getViewport({ scale: 1.0 });
-        finalScale = containerWidth / unscaledViewport.width;
-        setScale(Number(finalScale.toFixed(2)));
+        if (unscaledViewport.width > 0) {
+          finalScale = containerWidth / unscaledViewport.width;
+          setScale(Number(finalScale.toFixed(2)));
+        }
       }
 
       const viewport = page.getViewport({ scale: finalScale });
