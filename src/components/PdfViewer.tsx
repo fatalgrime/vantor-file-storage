@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, Loader2, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, Loader2, Download, RotateCw } from 'lucide-react';
 import { VantorFile } from '../lib/types';
 
 declare global {
@@ -24,6 +24,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(0);
   const [scale, setScale] = useState<number>(1.0);
+  const [rotation, setRotation] = useState<number>(0);
   const [isFitWidth, setIsFitWidth] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string>('');
@@ -112,7 +113,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
   }, [file.content, file.url]);
 
   // Handle rendering a page
-  const renderPage = async (pageNumber: number, currentScale: number, fitWidth: boolean) => {
+  const renderPage = async (pageNumber: number, currentScale: number, fitWidth: boolean, currentRotation: number) => {
     if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
 
     try {
@@ -120,10 +121,11 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
       const page = await pdfDoc.getPage(pageNumber);
 
       let finalScale = currentScale;
+      const totalRotation = ((page.rotate || 0) + currentRotation) % 360;
 
       if (fitWidth) {
         const containerWidth = Math.max(100, containerRef.current.clientWidth - 40); // Subtract padding
-        const unscaledViewport = page.getViewport({ scale: 1.0 });
+        const unscaledViewport = page.getViewport({ scale: 1.0, rotation: totalRotation });
         if (unscaledViewport.width > 0) {
           finalScale = containerWidth / unscaledViewport.width;
           setScale(Number(finalScale.toFixed(2)));
@@ -131,7 +133,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
       }
 
       const pixelRatio = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
-      const viewport = page.getViewport({ scale: finalScale * pixelRatio });
+      const viewport = page.getViewport({ scale: finalScale * pixelRatio, rotation: totalRotation });
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
 
@@ -155,24 +157,24 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
     }
   };
 
-  // Re-render page when PDF, page index, scale changes
+  // Re-render page when PDF, page index, scale, or rotation changes
   useEffect(() => {
     if (pdfDoc) {
-      renderPage(currentPage, scale, isFitWidth);
+      renderPage(currentPage, scale, isFitWidth, rotation);
     }
-  }, [pdfDoc, currentPage, scale, isFitWidth]);
+  }, [pdfDoc, currentPage, scale, isFitWidth, rotation]);
 
   // Adjust zoom on container resize if isFitWidth is active
   useEffect(() => {
     const handleResize = () => {
       if (isFitWidth && pdfDoc) {
-        renderPage(currentPage, scale, true);
+        renderPage(currentPage, scale, true, rotation);
       }
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [pdfDoc, currentPage, scale, isFitWidth]);
+  }, [pdfDoc, currentPage, scale, isFitWidth, rotation]);
 
   const handlePrevPage = () => {
     if (currentPage > 1) {
@@ -300,6 +302,15 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
             title="Fit to Width"
           >
             <Maximize2 className="h-4 w-4" />
+          </button>
+
+          <button
+            onClick={() => setRotation((r) => (r + 90) % 360)}
+            disabled={pageRendering}
+            className="p-1 rounded bg-slate-850 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-800 transition-colors text-slate-300 hover:text-white flex items-center space-x-1"
+            title="Rotate Page Right (90°)"
+          >
+            <RotateCw className="h-4 w-4" />
           </button>
         </div>
 
