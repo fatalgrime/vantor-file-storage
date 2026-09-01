@@ -14,6 +14,15 @@ const nextConfig = {
       },
     ],
   },
+  webpack: (config) => {
+    config.resolve.alias.canvas = false;
+    return config;
+  },
+  turbopack: {
+    resolveAlias: {
+      canvas: './src/lib/emptyModule.ts',
+    },
+  },
 };
 
 module.exports = nextConfig;

@@ -97,18 +97,18 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
         setTotalPages(doc.numPages);
         setCurrentPage(1);
 
-        // Pre-check text orientation on page 1
+        // Pre-inspect PDF bytecode and layout orientation on page 1 before unveiling canvas
         try {
           const page1 = await doc.getPage(1);
           const nativeRot = page1.rotate || 0;
           if (nativeRot === 0) {
-            const textRot = await detectPdfPageOrientation(page1);
-            if (textRot !== 0 && active) {
-              setAutoRotation(textRot);
+            const detectedRot = await inspectPdfBytecodeOrientation(page1);
+            if (detectedRot !== 0 && active) {
+              setAutoRotation(detectedRot);
             }
           }
         } catch (e) {
-          console.warn('Pre-check orientation warning:', e);
+          console.warn('Pre-inspect orientation warning:', e);
         }
 
         setLoading(false);
@@ -129,37 +129,79 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
   }, [file.content, file.url]);
 
   /**
-   * Automatically inspects PDF page text matrices to detect if page content is rendered upside-down (180° inverted).
+   * Inspects PDF page bytecode (operator list, text items, and Y-coordinate layout geometry)
+   * to determine exact native page orientation before canvas rendering.
    */
-  async function detectPdfPageOrientation(page: any): Promise<number> {
+  async function inspectPdfBytecodeOrientation(page: any): Promise<number> {
     try {
+      // 1. Inspect Text Content & Y-Position Geometry
       const textContent = await page.getTextContent();
       if (textContent && textContent.items && textContent.items.length > 0) {
-        let invertedCount = 0;
-        let uprightCount = 0;
-        let totalCount = 0;
+        const viewport = page.getViewport({ scale: 1.0 });
+        const pageHeight = viewport.height;
+
+        let topText = '';
+        let bottomText = '';
+        let invertedMatrixCount = 0;
+        let uprightMatrixCount = 0;
 
         for (const item of textContent.items) {
-          if (item.transform && item.transform.length >= 4) {
-            const [a, b] = item.transform;
+          if (item.transform && item.transform.length >= 6) {
+            const [a, b, _c, _d, _e, f] = item.transform;
             let angle = Math.atan2(b, a) * (180 / Math.PI);
             if (angle < 0) angle += 360;
 
-            totalCount++;
             if (angle >= 135 && angle <= 225) {
-              invertedCount++;
+              invertedMatrixCount++;
             } else if (angle < 45 || angle > 315) {
-              uprightCount++;
+              uprightMatrixCount++;
+            }
+
+            const y = f;
+            const str = (item.str || '').toLowerCase();
+            if (y > pageHeight * 0.55) {
+              topText += ' ' + str;
+            } else if (y < pageHeight * 0.40) {
+              bottomText += ' ' + str;
             }
           }
         }
 
-        if (totalCount > 0 && invertedCount > uprightCount && (invertedCount / totalCount) > 0.4) {
+        if (invertedMatrixCount > uprightMatrixCount && invertedMatrixCount > 2) {
+          return 180;
+        }
+
+        const signatureKeywords = ['signature', 'date:', 'roblox username', 'username:', 'sign below'];
+        const headerKeywords = ['attestation', 'confidential', 'policies', 'vantor office', 'educational affairs'];
+
+        const topHasSignature = signatureKeywords.some((kw) => topText.includes(kw));
+        const bottomHasHeader = headerKeywords.some((kw) => bottomText.includes(kw));
+
+        if (topHasSignature || bottomHasHeader) {
           return 180;
         }
       }
+
+      // 2. Inspect Operator List (Drawing Matrices for Scanned Image PDFs)
+      const opList = await page.getOperatorList();
+      if (opList && opList.fnArray && opList.argsArray) {
+        const OPS = window.pdfjsLib?.OPS || {};
+        const transformOp = OPS.transform;
+
+        for (let i = 0; i < opList.fnArray.length; i++) {
+          if (opList.fnArray[i] === transformOp) {
+            const matrix = opList.argsArray[i];
+            if (matrix && matrix.length >= 4) {
+              const [a, _b, _c, d] = matrix;
+              if (a < -0.1 && d < -0.1) {
+                return 180;
+              }
+            }
+          }
+        }
+      }
     } catch (err) {
-      console.warn('PDF text orientation check warning:', err);
+      console.warn('PDF bytecode orientation inspection error:', err);
     }
     return 0;
   }
@@ -232,7 +274,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, canDownload, onDownl
       let autoRot = currentAutoRot;
 
       if (nativeRotate === 0 && autoRot === 0) {
-        autoRot = await detectPdfPageOrientation(page);
+        autoRot = await inspectPdfBytecodeOrientation(page);
       }
 
       const totalRotation = (nativeRotate + autoRot + currentRotation) % 360;
