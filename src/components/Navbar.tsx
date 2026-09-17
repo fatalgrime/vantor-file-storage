@@ -328,16 +328,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Search className={`h-3.5 w-3.5 absolute left-2.5 top-2 ${isDark ? 'text-slate-400' : 'text-gray-400'}`} />
             <input
               type="text"
-              placeholder="Search files or folders..."
+              placeholder={showRepositoryIndex ? "Search repositories or contents..." : "Search files or folders..."}
+              aria-label={showRepositoryIndex ? "Search repositories or contents" : "Search files or folders"}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full border rounded-md pl-8 pr-3 py-1 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all ${isDark
+              className={`w-full border rounded-md pl-8 pr-7 py-1 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all ${isDark
                 ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700 text-white placeholder-slate-500'
                 : 'bg-white border-gray-200 hover:border-gray-300 text-gray-900 placeholder-gray-400'
                 }`}
             />
             {searchQuery && (
               <button
+                aria-label="Clear search"
                 onClick={() => setSearchQuery('')}
                 className={`absolute right-2 top-1 text-xs ${isDark ? 'text-slate-400 hover:text-white' : 'text-gray-400 hover:text-gray-700'}`}
               >

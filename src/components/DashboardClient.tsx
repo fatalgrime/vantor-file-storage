@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Navbar } from './Navbar';
 import { formatBytes, formatRelativeTime, getRepositoryLastUpdated, matchesModifiedFilter, sanitizeLegacyStateTimestamps } from '../lib/dateUtils';
 import { detectFileType } from '../lib/utils';
+import { matchesSearch } from '../lib/search';
 import { AnimatePresence, motion } from 'framer-motion';
 import { HelpCircle, X, Mail, Activity, Upload, Trash2, Key, Folder, ShieldAlert } from 'lucide-react';
 import { HeroChangelog } from './HeroChangelog';
@@ -102,6 +103,7 @@ type AppDialog =
 
 interface DashboardClientProps {
   initialRepositoryId?: string;
+  initialSearchQuery?: string;
   showRepositoryIndex?: boolean;
 }
 
@@ -111,7 +113,7 @@ const createScopedChangelog = (title: string, subtitle: string): HeroChangelogDa
   releases: [],
 });
 
-function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true }: DashboardClientProps) {
+function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', showRepositoryIndex = true }: DashboardClientProps) {
   const { addToast } = useToast();
   const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
@@ -347,7 +349,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Filtering & View state
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [modifiedFilter, setModifiedFilter] = useState('ALL');
   const [dashboardViewMode, setDashboardViewMode] = useState<'list' | 'grid'>('grid');
@@ -551,6 +553,22 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     return repositories.filter((repository) => canViewRepository(repository));
   }, [repositories, effectiveRole, currentUserId, files, folders]);
 
+  const displayedRepositories = useMemo(() => {
+    return visibleRepositories.filter((repository) =>
+      matchesSearch(repository, searchQuery) || [...files, ...folders].some((item) =>
+        (item.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id &&
+        canReadItem(effectiveRole, currentUserId, item, folders, repository) &&
+        matchesSearch(item, searchQuery)
+      )
+    );
+  }, [visibleRepositories, searchQuery, files, folders, effectiveRole, currentUserId]);
+
+  const handleOpenFolder = (folderId: string | null) => {
+    setCurrentFolderId(folderId);
+    setSearchQuery('');
+    setSelectedIds([]);
+  };
+
   useEffect(() => {
     if (!showRepositoryIndex) return;
     if (visibleRepositories.some((repository) => repository.id === currentRepositoryId)) return;
@@ -605,16 +623,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
 
       if (!canReadItem(effectiveRole, currentUserId, f, folders, currentRepository)) return false;
 
-      // Search query
-      if (query) {
-        return [
-          f.name,
-          f.description,
-          f.createdBy,
-          f.permissionLevel,
-          f.updatedAt,
-        ].some((value) => value.toLowerCase().includes(query));
-      }
+      if (!matchesSearch(f, query)) return false;
 
       // Type filter
       if (typeFilter !== 'ALL' && typeFilter !== 'Folder') return false;
@@ -635,22 +644,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
 
       if (!canReadItem(effectiveRole, currentUserId, f, folders, currentRepository)) return false;
 
-      // Search query
-      if (query) {
-        return [
-          f.name,
-          f.originalName,
-          f.description,
-          f.category,
-          f.fileType,
-          f.extension,
-          f.mimeType,
-          f.uploadedBy,
-          f.permissionLevel,
-          f.updatedAt,
-          ...f.tags,
-        ].some((value) => value.toLowerCase().includes(query));
-      }
+      if (!matchesSearch(f, query)) return false;
 
       // Type filter
       if (typeFilter !== 'ALL') {
@@ -986,7 +980,10 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
     setCurrentFolderId(null);
     setSelectedIds([]);
     setSearchQuery('');
-    router.push(`/dashboard/repositories/${repositoryId}`);
+    const query = searchQuery.trim();
+    const repository = repositories.find((item) => item.id === repositoryId);
+    const suffix = query && repository && !matchesSearch(repository, query) ? `?q=${encodeURIComponent(query)}` : '';
+    router.push(`/dashboard/repositories/${repositoryId}${suffix}`);
   };
 
   const handleUpdateCurrentChangelog = (nextChangelog: HeroChangelogData) => {
@@ -1574,7 +1571,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
       <Navbar
         showRepositoryIndex={showRepositoryIndex}
         searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
+        setSearchQuery={(query) => { setSearchQuery(query); setSelectedIds([]); }}
         typeFilter={typeFilter}
         setTypeFilter={setTypeFilter}
         modifiedFilter={modifiedFilter}
@@ -1657,6 +1654,11 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                   </button>
                 )}
               </div>
+            ) : displayedRepositories.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center" role="status">
+                <p className="text-sm text-slate-300">No repositories, files, or folders match “{searchQuery.trim()}”.</p>
+                <button onClick={() => setSearchQuery('')} className="mt-3 text-xs text-blue-400">Clear search</button>
+              </div>
             ) : dashboardViewMode === 'list' ? (
               <div className="overflow-x-auto rounded-lg border border-[#1e3059] bg-[#070c18]">
                 <table className="w-full text-left text-xs font-sans border-collapse">
@@ -1671,7 +1673,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#1e3059]/40 text-slate-200">
-                    {visibleRepositories.map((repository) => {
+                    {displayedRepositories.map((repository) => {
                       const repositoryFilesForCard = files.filter((file) => (file.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
                       const repositoryFoldersForCard = folders.filter((folder) => (folder.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
                       const repositoryFileCount = repositoryFilesForCard.length;
@@ -1726,7 +1728,7 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                {visibleRepositories.map((repository) => {
+                {displayedRepositories.map((repository) => {
                   const repositoryFilesForCard = files.filter((file) => (file.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
                   const repositoryFoldersForCard = folders.filter((folder) => (folder.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
                   const repositoryFileCount = repositoryFilesForCard.length;
@@ -1875,20 +1877,25 @@ function DashboardClientInner({ initialRepositoryId, showRepositoryIndex = true 
         {!showRepositoryIndex && currentRepository && canViewCurrentRepository && (
           <Breadcrumbs
             items={currentFolderPath}
-            onNavigateFolder={(id) => setCurrentFolderId(id)}
+            onNavigateFolder={handleOpenFolder}
             isDark={isDark}
           />
         )}
 
         {!showRepositoryIndex && currentRepository && canViewCurrentRepository && (
           <div className="space-y-3">
+            {searchQuery.trim() && (
+              <p role="status" className="text-xs text-slate-400">
+                {displayedFiles.length + displayedFolders.length} results in this repository for “{searchQuery.trim()}”
+              </p>
+            )}
             <FileBrowser
               folders={displayedFolders}
               files={displayedFiles}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
               onToggleSelectAll={handleToggleSelectAll}
-              onOpenFolder={(id) => setCurrentFolderId(id)}
+              onOpenFolder={handleOpenFolder}
               onPreviewFile={(file) => setPreviewFile(file)}
               onDownloadFile={handleDownloadFile}
               onCopyLink={handleCopyLink}
