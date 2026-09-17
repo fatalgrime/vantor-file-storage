@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 
 export interface CustomSelectOption<T extends string = string> {
@@ -31,6 +31,9 @@ export function CustomSelect<T extends string = string>({
   dropdownClassName = '',
   disabled = false,
 }: CustomSelectProps<T>) {
+  const listId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -49,6 +52,13 @@ export function CustomSelect<T extends string = string>({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      const selected = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+      (selected || listRef.current?.querySelector<HTMLElement>('[role="option"]'))?.focus();
+    }
+  }, [isOpen]);
 
   const handleToggle = () => {
     if (disabled) return;
@@ -71,9 +81,16 @@ export function CustomSelect<T extends string = string>({
       {/* Trigger Button */}
       <button
         type="button"
+        ref={triggerRef}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? listId : undefined}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); if (!isOpen) handleToggle(); }
+        }}
         disabled={disabled}
         onClick={handleToggle}
-        className={`w-full flex items-center justify-between gap-1.5 border px-3 py-1.5 rounded-md text-xs font-medium transition-all focus:outline-none focus:ring-1 focus:ring-blue-500 ${isOpen ? 'border-blue-500 ring-1 ring-blue-500/30' : 'border-slate-800 hover:border-slate-700'
+        className={`w-full min-h-8 flex items-center justify-between gap-1.5 border px-3 py-1.5 rounded-md text-xs font-medium transition-all focus:outline-none focus:ring-1 focus:ring-blue-500 ${isOpen ? 'border-blue-500 ring-1 ring-blue-500/30' : 'border-slate-800 hover:border-slate-700'
           } ${disabled
             ? 'bg-slate-900/50 text-slate-500 cursor-not-allowed border-slate-850'
             : 'bg-slate-900/90 text-slate-300 hover:text-white cursor-pointer'
@@ -95,6 +112,23 @@ export function CustomSelect<T extends string = string>({
       {/* Custom Dropdown Overlay */}
       {isOpen && (
         <div
+          ref={listRef}
+          id={listId}
+          role="listbox"
+          aria-label={placeholder}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setIsOpen(false); triggerRef.current?.focus(); }
+            if (event.key === 'Tab') { setIsOpen(false); triggerRef.current?.focus(); }
+            const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]'));
+            const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+            let next = index;
+            if (event.key === 'ArrowDown') next = (index + 1) % buttons.length;
+            else if (event.key === 'ArrowUp') next = (index - 1 + buttons.length) % buttons.length;
+            else if (event.key === 'Home') next = 0;
+            else if (event.key === 'End') next = buttons.length - 1;
+            else return;
+            event.preventDefault(); buttons[next]?.focus();
+          }}
           className={`absolute left-0 right-0 ${openUpward ? 'bottom-full mb-1' : 'top-full mt-1'} z-[150] min-w-full rounded-md border border-slate-700 bg-slate-900 py-1 text-xs shadow-2xl max-h-60 overflow-y-auto scrollbar-thin ${dropdownClassName}`}
         >
           {options.map((option) => {
@@ -102,10 +136,14 @@ export function CustomSelect<T extends string = string>({
             return (
               <button
                 key={option.value}
+                role="option"
+                aria-selected={isSelected}
+                tabIndex={-1}
                 type="button"
                 onClick={() => {
                   onChange(option.value);
                   setIsOpen(false);
+                  triggerRef.current?.focus();
                 }}
                 className={`w-full px-3 py-1.5 flex items-center justify-between space-x-2 text-left transition-colors cursor-pointer ${isSelected
                   ? 'bg-blue-600/20 text-blue-400 font-semibold'

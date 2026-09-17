@@ -7,6 +7,9 @@ import { Navbar } from './Navbar';
 import { formatBytes, formatRelativeTime, getRepositoryLastUpdated, matchesModifiedFilter, sanitizeLegacyStateTimestamps } from '../lib/dateUtils';
 import { detectFileType } from '../lib/utils';
 import { matchesSearch } from '../lib/search';
+import { getSearchResults, SearchResult } from '../lib/searchResults';
+import { SearchResults } from './SearchResults';
+import { useDialog } from '../hooks/useDialog';
 import { AnimatePresence, motion } from 'framer-motion';
 import { HelpCircle, X, Mail, Activity, Upload, Trash2, Key, Folder, ShieldAlert } from 'lucide-react';
 import { HeroChangelog } from './HeroChangelog';
@@ -104,6 +107,7 @@ type AppDialog =
 interface DashboardClientProps {
   initialRepositoryId?: string;
   initialSearchQuery?: string;
+  initialFolderId?: string;
   showRepositoryIndex?: boolean;
 }
 
@@ -113,7 +117,7 @@ const createScopedChangelog = (title: string, subtitle: string): HeroChangelogDa
   releases: [],
 });
 
-function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', showRepositoryIndex = true }: DashboardClientProps) {
+function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', initialFolderId, showRepositoryIndex = true }: DashboardClientProps) {
   const { addToast } = useToast();
   const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
@@ -346,7 +350,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
   // Selection state
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [storedSelectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Filtering & View state
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
@@ -443,6 +447,8 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
     isFolder: boolean;
   } | null>(null);
   const [dialog, setDialog] = useState<AppDialog | null>(null);
+  const dialogRef = useDialog(Boolean(dialog), () => setDialog(null));
+  const helpRef = useDialog(isHelpOpen, () => setIsHelpOpen(false));
 
   const handleSetTheme = (nextTheme: 'dark' | 'light') => {
     setTheme(nextTheme);
@@ -553,15 +559,19 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
     return repositories.filter((repository) => canViewRepository(repository));
   }, [repositories, effectiveRole, currentUserId, files, folders]);
 
-  const displayedRepositories = useMemo(() => {
-    return visibleRepositories.filter((repository) =>
-      matchesSearch(repository, searchQuery) || [...files, ...folders].some((item) =>
-        (item.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id &&
-        canReadItem(effectiveRole, currentUserId, item, folders, repository) &&
-        matchesSearch(item, searchQuery)
-      )
-    );
-  }, [visibleRepositories, searchQuery, files, folders, effectiveRole, currentUserId]);
+  const displayedRepositories = visibleRepositories;
+  const searchResults = useMemo(() => showRepositoryIndex
+    ? getSearchResults(searchQuery, repositories, files, folders, effectiveRole, currentUserId)
+    : [], [showRepositoryIndex, searchQuery, repositories, files, folders, effectiveRole, currentUserId]);
+
+  const handleOpenSearchResult = (result: SearchResult) => {
+    if (result.kind === 'file') {
+      setPreviewFile(result.item as VantorFile);
+    } else {
+      const suffix = result.kind === 'folder' ? `?folder=${encodeURIComponent(result.item.id)}` : '';
+      router.push(`/dashboard/repositories/${encodeURIComponent(result.repository.id)}${suffix}`);
+    }
+  };
 
   const handleOpenFolder = (folderId: string | null) => {
     setCurrentFolderId(folderId);
@@ -592,11 +602,22 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
     return files.filter((file) => (file.repositoryId || DEFAULT_REPOSITORY_ID) === currentRepositoryId && (currentRepository ? canViewRepository(currentRepository) : false));
   }, [files, currentRepositoryId, currentRepository, effectiveRole, currentUserId]);
 
+  useEffect(() => {
+    if (isLoading || !initialFolderId) return;
+    const target = folders.find((folder) => folder.id === initialFolderId &&
+      (folder.repositoryId || DEFAULT_REPOSITORY_ID) === initialRepositoryId);
+    if (target && canReadItem(effectiveRole, currentUserId, target, folders, currentRepository)) {
+      setCurrentFolderId(target.id);
+    }
+  }, [isLoading, initialFolderId, initialRepositoryId]);
+
   // Breadcrumb Trail Calculation
   const currentFolderPath = useMemo(() => {
     const trail: { id: string | null; name: string }[] = [{ id: null, name: currentRepository?.name || 'Repository' }];
     let cur = currentFolderId;
-    while (cur) {
+    const visited = new Set<string>();
+    while (cur && !visited.has(cur)) {
+      visited.add(cur);
       const found = repositoryFolders.find((f) => f.id === cur);
       if (found) {
         trail.splice(1, 0, { id: found.id, name: found.name });
@@ -664,6 +685,17 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
     });
   }, [repositoryFiles, currentFolderId, effectiveRole, currentUserId, searchQuery, typeFilter, modifiedFilter, folders, currentRepository]);
 
+  const selectedIds = useMemo(() => {
+    const visibleIds = new Set([...displayedFolders, ...displayedFiles].map((item) => item.id));
+    return showRepositoryIndex ? [] : storedSelectedIds.filter((id) => visibleIds.has(id));
+  }, [storedSelectedIds, displayedFolders, displayedFiles, showRepositoryIndex]);
+
+  useEffect(() => {
+    setSelectedIds((previous) => previous.length === selectedIds.length ? previous : selectedIds);
+  }, [selectedIds]);
+
+  useEffect(() => { setSelectedIds([]); }, [currentRepositoryId, currentFolderId, effectiveRole, currentUserId]);
+
   // Overall totals for current view
   const currentTotalSizeFormatted = useMemo(() => {
     const targetFiles = showRepositoryIndex ? files : displayedFiles;
@@ -680,13 +712,11 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
     );
   };
 
-  const handleToggleSelectAll = () => {
-    const allIds = [...displayedFolders.map((f) => f.id), ...displayedFiles.map((f) => f.id)];
-    if (selectedIds.length === allIds.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(allIds);
-    }
+  const handleToggleSelectAll = (pageIds: string[]) => {
+    const allSelected = pageIds.every((id) => selectedIds.includes(id));
+    setSelectedIds(allSelected
+      ? selectedIds.filter((id) => !pageIds.includes(id))
+      : [...new Set([...selectedIds, ...pageIds])]);
   };
 
   // Download logic
@@ -724,7 +754,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
     }
 
     // Add Audit Log
-    addAuditLog('DOWNLOAD', file.name, 'file', `Downloaded file (${file.formattedSize})`);
+    addAuditLog('DOWNLOAD', file.name, 'file', `Downloaded file (${file.formattedSize})`, file.repositoryId);
     persistState({ files: nextFiles }).catch((error) => setLoadError(error.message));
     addToast({ type: 'success', title: 'Download started', message: `"${file.name}" (${file.formattedSize})` });
   };
@@ -1573,9 +1603,9 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
         searchQuery={searchQuery}
         setSearchQuery={(query) => { setSearchQuery(query); setSelectedIds([]); }}
         typeFilter={typeFilter}
-        setTypeFilter={setTypeFilter}
+        setTypeFilter={(value) => { setTypeFilter(value); setSelectedIds([]); }}
         modifiedFilter={modifiedFilter}
-        setModifiedFilter={setModifiedFilter}
+        setModifiedFilter={(value) => { setModifiedFilter(value); setSelectedIds([]); }}
         viewMode={showRepositoryIndex ? dashboardViewMode : repositoryViewMode}
         setViewMode={(mode) => {
           if (showRepositoryIndex) {
@@ -1601,7 +1631,16 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
       />
 
       {/* Main Content Body */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main id="main-content" tabIndex={-1} className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {loadError && (
+          <div role="alert" className="rounded-lg border border-red-800 bg-red-950/40 p-4 text-sm text-red-200">
+            <p>{loadError}</p>
+            <button className="storage-button mt-3" onClick={() => window.location.reload()}>Retry loading</button>
+          </div>
+        )}
+        {showRepositoryIndex && searchQuery.trim() && !isLoading && !loadError && (
+          <SearchResults key={searchQuery.trim().toLowerCase()} results={searchResults} onOpen={handleOpenSearchResult} onClear={() => setSearchQuery('')} />
+        )}
         {/* Sitewide Announcement Banner */}
         <AnnouncementBanner
           announcements={announcements}
@@ -1613,13 +1652,13 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
         />
 
         {/* Dynamic Welcome Greeting (Clean typography without container box) */}
-        {showRepositoryIndex && (
+        {showRepositoryIndex && (!searchQuery.trim() || isLoading) && !loadError && (
           <div className="pt-2 pb-1">
             <h1 className="text-2xl font-bold text-white tracking-tight">{greetingMessage}</h1>
           </div>
         )}
 
-        {showRepositoryIndex && (
+        {showRepositoryIndex && (!searchQuery.trim() || isLoading) && !loadError && (
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -1636,15 +1675,15 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
               )}
             </div>
             {isLoading ? (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div role="status" aria-label="Loading repositories" className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div className="h-32 rounded-lg border border-slate-800 bg-slate-900/40 animate-pulse" />
                 <div className="h-32 rounded-lg border border-slate-800 bg-slate-900/40 animate-pulse" />
                 <div className="h-32 rounded-lg border border-slate-800 bg-slate-900/40 animate-pulse" />
               </div>
             ) : visibleRepositories.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-800 bg-slate-950/40 p-8 text-center">
-                <p className="text-sm font-semibold text-slate-300">No repositories found in database</p>
-                <p className="mt-1 text-xs text-slate-500">Create your first repository workspace to get started.</p>
+                <p className="text-sm font-semibold text-slate-300">No repositories available</p>
+                <p className="mt-1 text-xs text-slate-500">{canManagePlatform ? 'Create your first repository workspace to get started.' : 'Ask a repository manager to grant you access.'}</p>
                 {canManagePlatform && (
                   <button
                     onClick={handleCreateRepository}
@@ -1653,11 +1692,6 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
                     Create Repository
                   </button>
                 )}
-              </div>
-            ) : displayedRepositories.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center" role="status">
-                <p className="text-sm text-slate-300">No repositories, files, or folders match “{searchQuery.trim()}”.</p>
-                <button onClick={() => setSearchQuery('')} className="mt-3 text-xs text-blue-400">Clear search</button>
               </div>
             ) : dashboardViewMode === 'list' ? (
               <div className="overflow-x-auto rounded-lg border border-[#1e3059] bg-[#070c18]">
@@ -1693,7 +1727,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
                           className="hover:bg-slate-800/20 cursor-pointer"
                         >
                           <td className="px-4 py-3 font-semibold text-white flex items-center space-x-2">
-                            <span className="truncate">{repository.name}</span>
+                            <button className="truncate text-left hover:text-blue-400" onClick={(event) => { event.stopPropagation(); handleSelectRepository(repository.id); }}>{repository.name}</button>
                             {isActive && (
                               <span className="rounded bg-blue-600 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-white">Active</span>
                             )}
@@ -1742,21 +1776,21 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
                   const isActive = (repository as any).status !== 'inactive' && (repository as any).status !== 'archived' && (repository as any).isActive !== false;
 
                   return (
-                    <button
+                    <div
                       key={repository.id}
                       onClick={() => handleSelectRepository(repository.id)}
                       className="rounded-lg border border-[#1e3059] bg-[#070c18] hover:border-blue-700/80 p-4 text-left transition-colors"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <h2 className="truncate text-sm font-bold text-white">{repository.name}</h2>
+                          <h2 className="truncate text-sm font-bold text-white"><button className="max-w-full truncate text-left hover:text-blue-400" onClick={(event) => { event.stopPropagation(); handleSelectRepository(repository.id); }}>{repository.name}</button></h2>
                           <p className="mt-1 text-xs text-slate-400">{repository.description}</p>
                         </div>
                         {isActive && (
                           <span className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">Active</span>
                         )}
                       </div>
-                      <div className="mt-4 flex items-center gap-3 text-[11px] font-mono text-slate-400">
+                      <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] font-mono text-slate-400">
                         <span>{repositoryFolderCount} folders</span>
                         <span>{repositoryFileCount} files</span>
                         <span>Updated {formatRelativeTime(getRepositoryLastUpdated(repository, files, folders, auditLogs), repository.createdAt)}</span>
@@ -1766,43 +1800,29 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
                       </div>
                       {canManagePlatform && (
                         <div className="mt-3 flex items-center gap-2">
-                          <span
-                            role="button"
-                            tabIndex={0}
+                          <button
+                            type="button"
                             onClick={(event) => {
                               event.stopPropagation();
                               handleRenameRepository(repository);
                             }}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') {
-                                event.stopPropagation();
-                                handleRenameRepository(repository);
-                              }
-                            }}
                             className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:bg-slate-800"
                           >
                             Rename
-                          </span>
-                          <span
-                            role="button"
-                            tabIndex={0}
+                          </button>
+                          <button
+                            type="button"
                             onClick={(event) => {
                               event.stopPropagation();
                               handleRequestDeleteRepository(repository);
                             }}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') {
-                                event.stopPropagation();
-                                handleRequestDeleteRepository(repository);
-                              }
-                            }}
                             className="rounded border border-red-800 bg-red-950/70 px-2.5 py-1 text-[11px] font-semibold text-red-200 hover:bg-red-900"
                           >
                             Delete
-                          </span>
+                          </button>
                         </div>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -1812,7 +1832,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
 
         {!showRepositoryIndex && (
           isLoading ? (
-            <section className="rounded-lg border border-slate-800 bg-slate-900/40 p-4 animate-pulse">
+            <section role="status" aria-label="Loading repository" className="rounded-lg border border-slate-800 bg-slate-900/40 p-4 animate-pulse">
               <div className="h-4 w-32 bg-slate-700 rounded mb-3"></div>
               <div className="h-8 w-64 bg-slate-700 rounded mb-3"></div>
               <div className="h-4 w-96 bg-slate-700 rounded"></div>
@@ -1890,6 +1910,9 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
               </p>
             )}
             <FileBrowser
+              loading={isLoading}
+              emptyMessage={loadError ? 'Unable to load files. Use Retry loading above.' : searchQuery.trim() || typeFilter !== 'ALL' || modifiedFilter !== 'ALL' ? 'No files or folders match your search and filters.' : 'This folder is empty.'}
+              onClearFilters={searchQuery.trim() || typeFilter !== 'ALL' || modifiedFilter !== 'ALL' ? () => { setSearchQuery(''); setTypeFilter('ALL'); setModifiedFilter('ALL'); } : undefined}
               folders={displayedFolders}
               files={displayedFiles}
               selectedIds={selectedIds}
@@ -1928,7 +1951,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
         userId={currentUserId}
         userName={displayName}
         allFolders={folders}
-        repository={currentRepository}
+        repository={repositories.find((repo) => repo.id === (previewFile?.repositoryId || DEFAULT_REPOSITORY_ID))}
         comments={comments}
         users={managedUsers}
         onAddComment={handleAddComment}
@@ -1975,7 +1998,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
 
       {dialog && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-xl border border-[#1e3059] bg-[#070c18] shadow-2xl relative">
+          <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Repository action" tabIndex={-1} className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl border border-[#1e3059] bg-[#070c18] shadow-2xl relative">
             <div className="border-b border-[#1e3059] bg-[#090f22] px-5 py-4 rounded-t-xl">
               <h2 className="text-base font-bold text-white">
                 {dialog.type === 'rename'
@@ -2213,11 +2236,12 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', sh
 
             {/* Dialog Content */}
             <motion.div
+              ref={helpRef} role="dialog" aria-modal="true" aria-label="Help" tabIndex={-1}
               initial={{ scale: 0.95, opacity: 0, y: 15 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 15 }}
               transition={{ type: 'spring', duration: 0.4, bounce: 0.15 }}
-              className="relative w-full max-w-lg overflow-hidden rounded-xl border border-blue-900/60 bg-[#090f22] p-6 shadow-2xl"
+              className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-blue-900/60 bg-[#090f22] p-6 shadow-2xl"
             >
               {/* Close Button */}
               <button

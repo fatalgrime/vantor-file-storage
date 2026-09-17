@@ -82,12 +82,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isDark = true;
 
   return (
-    <header className={`sticky top-0 z-40 border-b transition-colors duration-300 ${isDark
+    <header className={`relative sm:sticky top-0 z-40 storage-toolbar border-b transition-colors duration-300 ${isDark
       ? 'border-[#1e3059] bg-[#070c18]/95 backdrop-blur-md'
       : 'border-gray-200 bg-white/95 backdrop-blur-md shadow-sm'
       }`}>
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:block focus:p-3 focus:text-blue-300">Skip to content</a>
       {/* Top Main Navigation Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-4 px-3 sm:px-6 py-3">
         {/* Brand */}
         <Link href="/dashboard" className="flex items-center space-x-3 select-none cursor-pointer group">
           <img
@@ -103,7 +104,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </Link>
 
         {/* Action Controls & Authentication */}
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Role Toggle Switcher */}
           {canUseRoleSwitcher && (
             <div className={`flex items-center space-x-1 rounded-lg border p-1 text-xs ${isDark ? 'bg-slate-900/90 border-slate-700/80' : 'bg-gray-100 border-gray-200'
@@ -183,7 +184,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={onBatchDelete}
               className="flex items-center space-x-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold border bg-red-950/80 border-red-700 text-red-200 hover:bg-red-900 hover:text-white transition-all shadow-md"
-              title="Delete selected files/folders"
+              aria-label="Delete selected files/folders" title="Delete selected files/folders"
             >
               <Trash2 className="h-3.5 w-3.5 text-red-400" />
               <span>Delete ({selectedCount})</span>
@@ -199,7 +200,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200'
                   : 'bg-gray-100 border-gray-200 hover:bg-gray-200 text-gray-700'
                   }`}
-                title="Upload file"
+                aria-label="Upload file" title="Upload file"
               >
                 <Upload className="h-3.5 w-3.5 text-blue-400" />
                 <span className="hidden sm:inline">Upload</span>
@@ -210,7 +211,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200'
                   : 'bg-gray-100 border-gray-200 hover:bg-gray-200 text-gray-700'
                   }`}
-                title="New folder"
+                aria-label="New folder" title="New folder"
               >
                 <FolderPlus className="h-3.5 w-3.5 text-emerald-500" />
                 <span className="hidden sm:inline">New Folder</span>
@@ -222,7 +223,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onOpenHelp}
             className="rounded-lg p-2 transition-all border bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white"
-            title="Help & Information"
+            aria-label="Help & Information" title="Help & Information"
           >
             <HelpCircle className="h-4 w-4" />
           </button>
@@ -260,12 +261,12 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Sub Navigation Bar: Filters, Search, View Switcher */}
-      <div className={`flex flex-wrap items-center justify-between gap-3 border-t px-6 py-2 transition-colors duration-300 ${isDark ? 'border-[#1e3059]/60 bg-[#090e1c]' : 'border-gray-100 bg-gray-50'
+      <div className={`flex flex-wrap items-center justify-between gap-3 border-t px-3 sm:px-6 py-2 transition-colors duration-300 ${isDark ? 'border-[#1e3059]/60 bg-[#090e1c]' : 'border-gray-100 bg-gray-50'
         }`}>
         {/* Left: Public Share & Filters */}
-        <div className="flex items-center space-x-3">
+        <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto">
           {/* Public Share Custom Dropdown */}
-          <div className="w-44">
+          <div className="min-w-0 flex-1 basis-36 sm:flex-none sm:w-44">
             <CustomSelect
               value="public_share"
               onChange={(val) => {
@@ -286,7 +287,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Type Filter Custom Dropdown */}
-          <div className="w-44">
+          <div className="min-w-0 flex-1 basis-36 sm:flex-none sm:w-44">
             <CustomSelect
               disabled={showRepositoryIndex}
               value={typeFilter}
@@ -305,7 +306,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Modified Date Filter Custom Dropdown */}
-          <div className="w-44">
+          <div className="min-w-0 flex-1 basis-36 sm:flex-none sm:w-44">
             <CustomSelect
               disabled={showRepositoryIndex}
               value={modifiedFilter}
@@ -322,10 +323,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Right: Search & View Mode Switcher */}
-        <div className="flex items-center space-x-3">
+        <div className="flex w-full items-center gap-2 lg:w-auto">
           {/* Quick Search Field */}
-          <div className="relative w-48 sm:w-64">
-            <Search className={`h-3.5 w-3.5 absolute left-2.5 top-2 ${isDark ? 'text-slate-400' : 'text-gray-400'}`} />
+          <div className="relative min-w-0 flex-1 sm:w-64">
+            <Search className={`h-3.5 w-3.5 absolute left-2.5 top-2.5 ${isDark ? 'text-slate-400' : 'text-gray-400'}`} />
             <input
               type="text"
               placeholder={showRepositoryIndex ? "Search repositories or contents..." : "Search files or folders..."}
@@ -341,7 +342,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 aria-label="Clear search"
                 onClick={() => setSearchQuery('')}
-                className={`absolute right-2 top-1 text-xs ${isDark ? 'text-slate-400 hover:text-white' : 'text-gray-400 hover:text-gray-700'}`}
+                className={`absolute right-1 top-0.5 text-xs ${isDark ? 'text-slate-400 hover:text-white' : 'text-gray-400 hover:text-gray-700'}`}
               >
                 ✕
               </button>
@@ -351,22 +352,22 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Grid / List View Toggle */}
           <div className={`flex items-center border rounded-md p-0.5 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-gray-100 border-gray-200'}`}>
             <button
-              onClick={() => setViewMode('list')}
+              aria-pressed={viewMode === 'list'} onClick={() => setViewMode('list')}
               className={`p-1 rounded transition-colors ${viewMode === 'list'
                 ? isDark ? 'bg-slate-800 text-blue-400' : 'bg-white text-blue-600 shadow-sm'
                 : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-400 hover:text-gray-700'
                 }`}
-              title="List View"
+              aria-label="List View" title="List View"
             >
               <List className="h-3.5 w-3.5" />
             </button>
             <button
-              onClick={() => setViewMode('grid')}
+              aria-pressed={viewMode === 'grid'} onClick={() => setViewMode('grid')}
               className={`p-1 rounded transition-colors ${viewMode === 'grid'
                 ? isDark ? 'bg-slate-800 text-blue-400' : 'bg-white text-blue-600 shadow-sm'
                 : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-400 hover:text-gray-700'
                 }`}
-              title="Grid View"
+              aria-label="Grid View" title="Grid View"
             >
               <Grid className="h-3.5 w-3.5" />
             </button>

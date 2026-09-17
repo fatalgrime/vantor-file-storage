@@ -1,5 +1,7 @@
 'use client';
 
+import { useDialog } from '../hooks/useDialog';
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
@@ -95,6 +97,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onClearAuditLogs,
   activeTabDefault = 'upload',
 }) => {
+  const dialogRef = useDialog(isOpen, onClose);
   const isManager = role === 'manager';
   const [activeTab, setActiveTab] = useState<AdminTab>(activeTabDefault);
   const [creationStatus, setCreationStatus] = useState<{ type: 'file' | 'folder'; name: string } | null>(null);
@@ -316,9 +319,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-      <div className="relative w-full max-w-4xl rounded-xl border border-[#1e3059] bg-[#070c18] shadow-2xl overflow-hidden flex flex-col min-h-[550px] max-h-[90vh]">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Content administration" tabIndex={-1} className="relative w-full max-w-4xl rounded-xl border border-[#1e3059] bg-[#070c18] shadow-2xl overflow-hidden flex flex-col min-h-0 sm:min-h-[550px] max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#1e3059] px-6 py-4 bg-[#090f22] flex-shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1e3059] px-3 sm:px-6 py-4 bg-[#090f22] flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-900/60 border border-blue-700/80 text-blue-400">
               {isManager ? <Sparkles className="h-5 w-5 text-indigo-400" /> : <ShieldCheck className="h-5 w-5 text-blue-400" />}
@@ -335,7 +338,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
+          <button aria-label="Close dialog" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
             <X className="h-5 w-5" />
           </button>
         </div>

@@ -52,14 +52,16 @@ export const canReadItem = (
 ): boolean => {
   if (role === 'admin' || role === 'manager') return true;
 
-  if (repository && !hasRepositoryAccess(role, userId, repository, [], allFolders)) {
+  if (repository && !hasRepositoryAccess(role, userId, repository, 'folderId' in item ? [item] : [], allFolders)) {
     return false;
   }
 
   if (item.collaborators?.some((c) => c.userId === userId)) return true;
 
   let currentParentId = 'parentId' in item ? item.parentId : (item as VantorFile).folderId;
-  while (currentParentId) {
+  const visited = new Set<string>();
+  while (currentParentId && !visited.has(currentParentId)) {
+    visited.add(currentParentId);
     const parentFolder = allFolders.find((f) => f.id === currentParentId);
     if (!parentFolder) break;
     if (parentFolder.collaborators?.some((c) => c.userId === userId)) return true;
@@ -92,7 +94,7 @@ export const canEditItem = (
   if (role === 'admin' || role === 'manager') return true;
   if (role === 'viewer') return false;
 
-  if (repository && !hasRepositoryAccess(role, userId, repository, [], allFolders)) {
+  if (repository && !hasRepositoryAccess(role, userId, repository, 'folderId' in item ? [item] : [], allFolders)) {
     return false;
   }
 
@@ -102,7 +104,9 @@ export const canEditItem = (
   if (directCollab?.role === 'editor') return true;
 
   let currentParentId = 'parentId' in item ? item.parentId : (item as VantorFile).folderId;
-  while (currentParentId) {
+  const visited = new Set<string>();
+  while (currentParentId && !visited.has(currentParentId)) {
+    visited.add(currentParentId);
     const parentFolder = allFolders.find((f) => f.id === currentParentId);
     if (!parentFolder) break;
     const parentCollab = parentFolder.collaborators?.find((c) => c.userId === userId);

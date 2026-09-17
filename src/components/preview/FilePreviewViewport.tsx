@@ -34,7 +34,7 @@ export const FilePreviewViewport: React.FC<FilePreviewViewportProps> = ({ file, 
   }
 
   if (isPdf) {
-    return <PdfDocumentViewer file={file} canDownload={canDownload} onDownload={onDownload} />;
+    return <PdfDocumentViewer file={file} />;
   }
 
   if (isAudio || isVideo) {

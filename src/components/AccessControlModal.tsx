@@ -1,5 +1,7 @@
 'use client';
 
+import { useDialog } from '../hooks/useDialog';
+
 import React, { useState } from 'react';
 import {
   X,
@@ -52,6 +54,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
   shares,
   onSaveShares,
 }) => {
+  const dialogRef = useDialog(Boolean(item), onClose);
   if (!item) return null;
 
   const [activeTab, setActiveTab] = useState<'policy' | 'share' | 'links'>('policy');
@@ -195,8 +198,8 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-xl sm:max-w-2xl rounded-xl border border-[#1e3059] bg-[#070d1d] shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between border-b border-[#1e3059] px-6 py-4 bg-[#090f22] flex-shrink-0 rounded-t-xl">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Access and security settings" tabIndex={-1} className="relative w-full max-w-xl sm:max-w-2xl rounded-xl border border-[#1e3059] bg-[#070d1d] shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1e3059] px-3 sm:px-6 py-4 bg-[#090f22] flex-shrink-0 rounded-t-xl">
           <div className="flex items-center space-x-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-950 border border-amber-800 text-amber-400">
               <Lock className="h-4 w-4" />
@@ -208,7 +211,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
+          <button aria-label="Close dialog" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -435,7 +438,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
             <div className="space-y-6">
               {/* Generate New Link Form */}
               <form onSubmit={handleCreateShareLink} className="bg-[#090f22]/90 p-5 border border-slate-800 rounded-xl space-y-4 shadow-xl">
-                <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
                   <h4 className="font-bold text-white text-sm flex items-center space-x-2">
                     <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-950/80 border border-blue-800/60 text-blue-400">
                       <LinkIcon className="h-4 w-4" />
@@ -649,7 +652,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
         {/* Footer Actions */}
         <div className="flex items-center justify-end space-x-3 p-5 border-t border-[#1e3059] bg-[#090f22] flex-shrink-0 rounded-b-xl">
           <button
-            onClick={onClose}
+            aria-label="Close dialog" onClick={onClose}
             className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition-colors"
           >
             Cancel
@@ -663,7 +666,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
             </button>
           ) : (
             <button
-              onClick={onClose}
+              aria-label="Close dialog" onClick={onClose}
               className="rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-glow-blue transition-all"
             >
               Close Settings

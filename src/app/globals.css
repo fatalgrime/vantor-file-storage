@@ -99,3 +99,44 @@ select {
   background-size: 0.9em 0.9em !important;
   padding-right: 2.5rem !important;
 }
+
+/* Shared controls and keyboard navigation. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #60a5fa !important;
+  outline-offset: 3px;
+}
+button:disabled { cursor: not-allowed; }
+.storage-button {
+  display: inline-flex;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  border: 1px solid #334155;
+  border-radius: .375rem;
+  padding: .375rem .75rem;
+  font-size: .75rem;
+  color: #cbd5e1;
+  background: #0f172a;
+}
+.storage-button:hover:not(:disabled) { background: #1e293b; }
+.storage-button:disabled { opacity: .4; }
+.storage-icon-button, .file-browser button:has(> svg:only-child) {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: .375rem;
+}
+.storage-toolbar button, .storage-toolbar input { min-height: 2rem; }
+.file-browser th, .file-browser td { white-space: nowrap; }
+@media (max-width: 639px) {
+  .file-browser th:nth-child(n+4), .file-browser td:nth-child(n+4) { display: none; }
+  .file-browser td:nth-child(2) button { max-width: 45vw; }
+  .file-browser th, .file-browser td { padding-left: .375rem; padding-right: .375rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

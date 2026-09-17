@@ -1,5 +1,7 @@
 'use client';
 
+import { useDialog } from '../hooks/useDialog';
+
 import React, { useState } from 'react';
 import {
   X,
@@ -54,6 +56,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   onResolveComment,
   onDeleteComment,
 }) => {
+  const dialogRef = useDialog(Boolean(file), onClose);
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'preview' | 'details' | 'security' | 'comments'>('preview');
 
@@ -75,15 +78,15 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-3xl rounded-xl border border-[#1e3059] bg-[#070d1d] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="File preview" tabIndex={-1} className="relative w-full max-w-3xl rounded-xl border border-[#1e3059] bg-[#070d1d] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#1e3059] px-6 py-4 bg-[#090f22]">
-          <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1e3059] px-3 sm:px-6 py-4 bg-[#090f22]">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-950 border border-blue-800 text-blue-400">
               <Eye className="h-4 w-4" />
             </div>
-            <div>
-              <h3 className="font-bold text-base text-white">{file.name}</h3>
+            <div className="min-w-0">
+              <h3 className="truncate font-bold text-base text-white">{file.name}</h3>
               <p className="text-xs text-slate-400">{file.category} · {file.fileType}</p>
             </div>
           </div>
@@ -100,7 +103,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
             )}
 
             <button
-              onClick={onClose}
+              aria-label="Close dialog" onClick={onClose}
               className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
             >
               <X className="h-5 w-5" />
@@ -109,9 +112,9 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-slate-800 bg-slate-950/40 px-6 pt-2 overflow-x-auto">
+        <div className="flex border-b border-slate-800 bg-slate-950/40 px-3 sm:px-6 pt-2 overflow-x-auto">
           <button
-            onClick={() => setActiveTab('preview')}
+            aria-pressed={activeTab === 'preview'} onClick={() => setActiveTab('preview')}
             className={`pb-2.5 px-4 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${activeTab === 'preview'
               ? 'border-blue-500 text-blue-400 font-semibold'
               : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -120,7 +123,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
             File Preview
           </button>
           <button
-            onClick={() => setActiveTab('comments')}
+            aria-pressed={activeTab === 'comments'} onClick={() => setActiveTab('comments')}
             className={`pb-2.5 px-4 text-xs font-medium border-b-2 transition-all whitespace-nowrap flex items-center space-x-1.5 ${activeTab === 'comments'
               ? 'border-blue-500 text-blue-400 font-semibold'
               : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -134,7 +137,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
             )}
           </button>
           <button
-            onClick={() => setActiveTab('details')}
+            aria-pressed={activeTab === 'details'} onClick={() => setActiveTab('details')}
             className={`pb-2.5 px-4 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${activeTab === 'details'
               ? 'border-blue-500 text-blue-400 font-semibold'
               : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -143,7 +146,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
             Metadata & Properties
           </button>
           <button
-            onClick={() => setActiveTab('security')}
+            aria-pressed={activeTab === 'security'} onClick={() => setActiveTab('security')}
             className={`pb-2.5 px-4 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${activeTab === 'security'
               ? 'border-blue-500 text-blue-400 font-semibold'
               : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -154,7 +157,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         </div>
 
         {/* Body Content */}
-        <div className="flex-grow overflow-y-auto p-6 space-y-6">
+        <div className="flex-grow overflow-y-auto p-3 sm:p-6 space-y-6">
           {activeTab === 'preview' && renderContentPreview()}
 
           {activeTab === 'comments' && (

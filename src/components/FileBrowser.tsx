@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Folder,
@@ -25,6 +25,7 @@ import {
   FolderInput
 } from 'lucide-react';
 import { VantorFile, VantorFolder, UserRole } from '../lib/types';
+import { Pagination, PAGE_SIZE } from './Pagination';
 import { formatRelativeTime, parseDate } from '../lib/dateUtils';
 
 interface FileBrowserProps {
@@ -32,7 +33,10 @@ interface FileBrowserProps {
   files: VantorFile[];
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
-  onToggleSelectAll: () => void;
+  onToggleSelectAll: (ids: string[]) => void;
+  loading?: boolean;
+  emptyMessage?: string;
+  onClearFilters?: () => void;
   onOpenFolder: (folderId: string) => void;
   onPreviewFile: (file: VantorFile) => void;
   onDownloadFile: (file: VantorFile) => void;
@@ -54,6 +58,9 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   selectedIds,
   onToggleSelect,
   onToggleSelectAll,
+  loading = false,
+  emptyMessage = 'This folder is empty.',
+  onClearFilters,
   onOpenFolder,
   onPreviewFile,
   onDownloadFile,
@@ -78,7 +85,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const totalItems = folders.length + files.length;
-  const allSelected = totalItems > 0 && selectedIds.length === totalItems;
+
 
   const handleSort = (field: 'name' | 'type' | 'size' | 'modified') => {
     if (sortField === field) {
@@ -123,6 +130,27 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     return copy;
   }, [files, sortField, sortOrder]);
 
+  const [requestedPage, setPage] = useState(1);
+  const page = Math.min(requestedPage, Math.max(1, Math.ceil(totalItems / PAGE_SIZE)));
+  const start = (page - 1) * PAGE_SIZE;
+  const pageFolders = sortedFolders.slice(start, start + PAGE_SIZE);
+  const pageFiles = sortedFiles.slice(Math.max(0, start - sortedFolders.length), Math.max(0, start + PAGE_SIZE - sortedFolders.length));
+  const pageIds = [...pageFolders, ...pageFiles].map((item) => item.id);
+  const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
+  const resultKey = [...folders, ...files].map((item) => item.id).join('|');
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => { setPage(1); setActiveMenu(null); }, [resultKey, sortField, sortOrder]);
+  useEffect(() => {
+    if (!activeMenu) return;
+    menuRef.current?.querySelector('button')?.focus();
+    const close = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node) && !menuTriggerRef.current?.contains(event.target as Node)) setActiveMenu(null);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [activeMenu]);
+
   const handleMenuToggle = (
     event: React.MouseEvent<HTMLButtonElement>,
     id: string,
@@ -135,13 +163,19 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       return;
     }
 
+    menuTriggerRef.current = event.currentTarget;
     const rect = event.currentTarget.getBoundingClientRect();
     setActiveMenu({
       id,
-      x: Math.min(rect.left, window.innerWidth - 192),
-      y: rect.bottom + 6,
+      x: Math.max(8, Math.min(rect.left, window.innerWidth - 192)),
+      y: Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 320)),
       isFolder,
     });
+  };
+
+  const closeActionMenu = () => {
+    setActiveMenu(null);
+    if (menuTriggerRef.current?.isConnected) menuTriggerRef.current.focus();
   };
 
   const renderActionMenu = () => {
@@ -157,28 +191,40 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       <div
         className="fixed z-[100] w-44 rounded-md border border-slate-700 bg-slate-900 py-1 text-left text-xs shadow-2xl"
         style={{ left: activeMenu.x, top: activeMenu.y }}
-        onMouseLeave={() => setActiveMenu(null)}
+        ref={menuRef}
+        role="group"
+        aria-label={`Actions for ${item.name}`}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') { event.stopPropagation(); closeActionMenu(); menuTriggerRef.current?.focus(); }
+          if (event.key === 'Tab') { closeActionMenu(); menuTriggerRef.current?.focus(); }
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            const buttons = Array.from(event.currentTarget.querySelectorAll('button'));
+            const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+            buttons[(index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+          }
+        }}
       >
         {activeMenu.isFolder ? (
           <button
-            onClick={() => { onOpenFolder(item.id); setActiveMenu(null); }}
-            className="w-full px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-slate-200"
+            onClick={() => { onOpenFolder(item.id); closeActionMenu(); }}
+            className="w-full min-h-9 px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-slate-200"
           >
             <Eye className="h-3.5 w-3.5 text-blue-400" />
-            <span>Open Folder</span>
+            <span>Open folder</span>
           </button>
         ) : (
           <>
             <button
-              onClick={() => { onPreviewFile(item as VantorFile); setActiveMenu(null); }}
-              className="w-full px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-slate-200"
+              onClick={() => { onPreviewFile(item as VantorFile); closeActionMenu(); }}
+              className="w-full min-h-9 px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-slate-200"
             >
               <Eye className="h-3.5 w-3.5 text-blue-400" />
               <span>Preview</span>
             </button>
             <button
-              onClick={() => { onDownloadFile(item as VantorFile); setActiveMenu(null); }}
-              className="w-full px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-slate-200"
+              onClick={() => { onDownloadFile(item as VantorFile); closeActionMenu(); }}
+              className="w-full min-h-9 px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-slate-200"
             >
               <Download className="h-3.5 w-3.5 text-emerald-400" />
               <span>Download</span>
@@ -187,19 +233,19 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         )}
 
         <button
-          onClick={() => { onCopyLink(item); setActiveMenu(null); }}
-          className="w-full px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-slate-200"
+          onClick={() => { onCopyLink(item); closeActionMenu(); }}
+          className="w-full min-h-9 px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-slate-200"
         >
           <Copy className="h-3.5 w-3.5 text-slate-400" />
-          <span>Copy Link</span>
+          <span>Copy link</span>
         </button>
 
         {(canEdit(item) || canDelete || canManagePermissions(item)) && (
           <>
             {canManagePermissions(item) && (
               <button
-                onClick={() => { onManagePermissions(item, activeMenu.isFolder); setActiveMenu(null); }}
-                className="w-full px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-slate-200"
+                onClick={() => { onManagePermissions(item, activeMenu.isFolder); closeActionMenu(); }}
+                className="w-full min-h-9 px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-slate-200"
               >
                 <Lock className="h-3.5 w-3.5 text-amber-400" />
                 <span>Permissions</span>
@@ -208,15 +254,15 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             {canEdit(item) && (
               <>
                 <button
-                  onClick={() => { onEditItem(item, activeMenu.isFolder); setActiveMenu(null); }}
-                  className="w-full px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-slate-200"
+                  onClick={() => { onEditItem(item, activeMenu.isFolder); closeActionMenu(); }}
+                  className="w-full min-h-9 px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-slate-200"
                 >
                   <Edit className="h-3.5 w-3.5 text-slate-400" />
-                  <span>{activeMenu.isFolder ? 'Rename' : 'Edit Metadata'}</span>
+                  <span>{activeMenu.isFolder ? 'Rename' : 'Edit metadata'}</span>
                 </button>
                 <button
-                  onClick={() => { onMoveItem(item, activeMenu.isFolder); setActiveMenu(null); }}
-                  className="w-full px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-slate-200"
+                  onClick={() => { onMoveItem(item, activeMenu.isFolder); closeActionMenu(); }}
+                  className="w-full min-h-9 px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-slate-200"
                 >
                   <FolderInput className="h-3.5 w-3.5 text-blue-400" />
                   <span>Move</span>
@@ -227,8 +273,8 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
               <>
                 <div className="my-1 border-t border-slate-800"></div>
                 <button
-                  onClick={() => { onDeleteItem(item.id, activeMenu.isFolder); setActiveMenu(null); }}
-                  className="w-full px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-red-400"
+                  onClick={() => { onDeleteItem(item.id, activeMenu.isFolder); closeActionMenu(); }}
+                  className="w-full min-h-9 px-3 py-1.5 hover:bg-slate-800 flex items-center space-x-2 text-red-400"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   <span>Delete</span>
@@ -291,8 +337,20 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     }
   };
 
+  if (loading) return <div role="status" aria-live="polite" className="rounded-lg border border-slate-800 p-8 text-center text-sm text-slate-400">Loading files and folders…</div>;
+  if (totalItems === 0) return (
+    <div role="status" className="rounded-lg border border-dashed border-slate-700 p-8 text-center text-sm text-slate-400">
+      <p>{emptyMessage}</p>
+      {onClearFilters && <button className="storage-button mt-3" onClick={onClearFilters}>Clear search and filters</button>}
+    </div>
+  );
+
   return (
-    <div className="w-full">
+    <div className="file-browser w-full min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 text-xs text-slate-400">
+        <button className="storage-button" aria-pressed={allSelected} onClick={() => onToggleSelectAll(pageIds)}>{allSelected ? 'Deselect page' : 'Select page'}</button>
+        <span role="status">{selectedIds.length} selected · {totalItems} items</span>
+      </div>
       {viewMode === 'list' ? (
         /* List View Table matching user screenshot layout */
         <div className="overflow-x-auto rounded-lg border border-[#1e3059] bg-[#070c18]">
@@ -300,7 +358,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             <thead>
               <tr className="border-b border-[#1e3059] bg-[#090f21] text-slate-400 select-none">
                 <th className="w-10 px-3 py-2.5 text-center">
-                  <button onClick={onToggleSelectAll} className="text-slate-400 hover:text-white transition-colors">
+                  <button aria-label="Select or deselect this page" aria-pressed={allSelected} onClick={() => onToggleSelectAll(pageIds)} className="text-slate-400 hover:text-white transition-colors">
                     {allSelected ? (
                       <CheckSquare className="h-4 w-4 text-blue-500" />
                     ) : (
@@ -334,7 +392,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             </thead>
             <tbody className="divide-y divide-[#1e3059]/40 text-slate-200">
               {/* Folder Rows */}
-              {sortedFolders.map((folder) => {
+              {pageFolders.map((folder) => {
                 const isSelected = selectedIds.includes(folder.id);
                 return (
                   <tr
@@ -343,7 +401,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                   >
                     {/* Checkbox */}
                     <td className="px-3 py-2 text-center">
-                      <button onClick={() => onToggleSelect(folder.id)} className="text-slate-400 hover:text-white">
+                      <button aria-label={`Select ${folder.name}`} aria-pressed={isSelected} onClick={() => onToggleSelect(folder.id)} className="text-slate-400 hover:text-white">
                         {isSelected ? (
                           <CheckSquare className="h-4 w-4 text-blue-500" />
                         ) : (
@@ -369,6 +427,8 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                     {/* Options Context Menu Button */}
                     <td className="px-2 py-2 text-center relative">
                       <button
+                        aria-label={`Actions for ${folder.name}`}
+                        aria-expanded={activeMenu?.id === folder.id}
                         onClick={(event) => handleMenuToggle(event, folder.id, true)}
                         className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
                       >
@@ -389,7 +449,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
               })}
 
               {/* File Rows */}
-              {sortedFiles.map((file) => {
+              {pageFiles.map((file) => {
                 const isSelected = selectedIds.includes(file.id);
                 return (
                   <tr
@@ -398,7 +458,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                   >
                     {/* Checkbox */}
                     <td className="px-3 py-2 text-center">
-                      <button onClick={() => onToggleSelect(file.id)} className="text-slate-400 hover:text-white">
+                      <button aria-label={`Select ${file.name}`} aria-pressed={isSelected} onClick={() => onToggleSelect(file.id)} className="text-slate-400 hover:text-white">
                         {isSelected ? (
                           <CheckSquare className="h-4 w-4 text-blue-500" />
                         ) : (
@@ -424,6 +484,8 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                     {/* Context Action Button */}
                     <td className="px-2 py-2 text-center relative">
                       <button
+                        aria-label={`Actions for ${file.name}`}
+                        aria-expanded={activeMenu?.id === file.id}
                         onClick={(event) => handleMenuToggle(event, file.id, false)}
                         className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
                       >
@@ -443,20 +505,13 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                 );
               })}
 
-              {folders.length === 0 && files.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
-                    <p className="text-sm font-medium">No files or folders found in this directory.</p>
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
       ) : (
         /* Grid View Mode */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {sortedFolders.map((folder) => {
+          {pageFolders.map((folder) => {
             const isSelected = selectedIds.includes(folder.id);
             return (
               <div
@@ -465,7 +520,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                   }`}
               >
                 <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3 flex-1 min-w-0" onClick={() => onOpenFolder(folder.id)}>
+                  <div className="flex items-center space-x-3 flex-1 min-w-0" role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenFolder(folder.id); } }} onClick={() => onOpenFolder(folder.id)}>
                     <Folder className="h-8 w-8 text-blue-500 fill-blue-500/20 flex-shrink-0" />
                     <div className="min-w-0 flex-1">
                       <h3 className="font-bold text-sm text-white group-hover:text-blue-400 truncate">
@@ -475,16 +530,10 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center space-x-1 ml-2">
-                    {canDelete && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onDeleteItem(folder.id, true); }}
-                        className="p-1 rounded text-red-400 hover:bg-red-950/60 hover:text-red-300 transition-colors"
-                        title="Delete folder"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    <button onClick={(e) => { e.stopPropagation(); onToggleSelect(folder.id); }}>
+                    <button aria-label={`Actions for ${folder.name}`} aria-expanded={activeMenu?.id === folder.id} className="storage-icon-button" onClick={(event) => handleMenuToggle(event, folder.id, true)}>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                    <button aria-label={`Select ${folder.name}`} aria-pressed={isSelected} onClick={(e) => { e.stopPropagation(); onToggleSelect(folder.id); }}>
                       {isSelected ? <CheckSquare className="h-4 w-4 text-blue-500" /> : <Square className="h-4 w-4 text-slate-600" />}
                     </button>
                   </div>
@@ -493,7 +542,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             );
           })}
 
-          {sortedFiles.map((file) => {
+          {pageFiles.map((file) => {
             const isSelected = selectedIds.includes(file.id);
             return (
               <div
@@ -502,7 +551,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                   }`}
               >
                 <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3 cursor-pointer flex-1 min-w-0" onClick={() => onPreviewFile(file)}>
+                  <div className="flex items-center space-x-3 cursor-pointer flex-1 min-w-0" role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onPreviewFile(file); } }} onClick={() => onPreviewFile(file)}>
                     {getFileIcon(file)}
                     <div className="min-w-0 flex-1">
                       <h3 className="font-bold text-sm text-white group-hover:text-blue-400 truncate">
@@ -512,16 +561,10 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center space-x-1 ml-2">
-                    {canDelete && (
-                      <button
-                        onClick={() => onDeleteItem(file.id, false)}
-                        className="p-1 rounded text-red-400 hover:bg-red-950/60 hover:text-red-300 transition-colors"
-                        title="Delete file"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    <button onClick={() => onToggleSelect(file.id)}>
+                    <button aria-label={`Actions for ${file.name}`} aria-expanded={activeMenu?.id === file.id} className="storage-icon-button" onClick={(event) => handleMenuToggle(event, file.id, false)}>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                    <button aria-label={`Select ${file.name}`} aria-pressed={isSelected} onClick={() => onToggleSelect(file.id)}>
                       {isSelected ? <CheckSquare className="h-4 w-4 text-blue-500" /> : <Square className="h-4 w-4 text-slate-600" />}
                     </button>
                   </div>
@@ -530,7 +573,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                   <span>Modified: {formatRelativeTime(file.updatedAt, file.createdAt, { concise: true })}</span>
                   <button onClick={() => onDownloadFile(file)} className="text-blue-400 hover:underline flex items-center space-x-1">
                     <Download className="h-3 w-3" />
-                    <span>Get</span>
+                    <span>Download</span>
                   </button>
                 </div>
               </div>
@@ -538,6 +581,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           })}
         </div>
       )}
+      <Pagination page={page} total={totalItems} onChange={(next) => { setPage(next); setActiveMenu(null); }} />
       {renderActionMenu()}
     </div>
   );

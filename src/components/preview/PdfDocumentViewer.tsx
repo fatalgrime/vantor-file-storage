@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, Loader2, Download, RotateCw, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, Loader2, RotateCw } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 import { VantorFile } from '../../lib/types';
 
@@ -12,11 +12,9 @@ if (typeof window !== 'undefined') {
 
 interface PdfDocumentViewerProps {
   file: VantorFile;
-  canDownload: boolean;
-  onDownload: (file: VantorFile) => void;
 }
 
-export const PdfDocumentViewer: React.FC<PdfDocumentViewerProps> = ({ file, canDownload, onDownload }) => {
+export const PdfDocumentViewer: React.FC<PdfDocumentViewerProps> = ({ file }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderTaskRef = useRef<any>(null);
@@ -211,11 +209,6 @@ export const PdfDocumentViewer: React.FC<PdfDocumentViewerProps> = ({ file, canD
     setRotation((prev) => (prev + 90) % 360);
   };
 
-  const handleReset = () => {
-    setIsFitWidth(true);
-    setRotation(0);
-  };
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[350px] p-8 text-slate-400 bg-slate-950/20 rounded-xl border border-slate-800">
@@ -239,11 +232,12 @@ export const PdfDocumentViewer: React.FC<PdfDocumentViewerProps> = ({ file, canD
       {/* Toolbar Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-[#080d1a] border-b border-slate-800 px-4 py-2.5 flex-shrink-0 text-slate-200">
         {/* Page Navigation */}
-        <div className="flex items-center space-x-1.5">
+        <div className="flex items-center gap-2">
           <button
             onClick={handlePrevPage}
             disabled={currentPage <= 1 || pageRendering}
-            className="p-1 rounded bg-slate-850 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 transition-colors"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-850 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 transition-colors"
+            aria-label="Previous page"
             title="Previous page"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -254,7 +248,8 @@ export const PdfDocumentViewer: React.FC<PdfDocumentViewerProps> = ({ file, canD
               value={currentPage}
               onChange={handlePageSelect}
               disabled={pageRendering}
-              className="bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-xs text-white outline-none cursor-pointer"
+              aria-label="Page number"
+              className="h-8 min-w-16 bg-slate-950 border border-slate-800 rounded pl-2 py-0 text-xs text-white outline-none cursor-pointer"
             >
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                 <option key={p} value={p}>
@@ -269,7 +264,8 @@ export const PdfDocumentViewer: React.FC<PdfDocumentViewerProps> = ({ file, canD
           <button
             onClick={handleNextPage}
             disabled={currentPage >= totalPages || pageRendering}
-            className="p-1 rounded bg-slate-850 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 transition-colors"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-850 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 transition-colors"
+            aria-label="Next page"
             title="Next page"
           >
             <ChevronRight className="h-4 w-4" />
@@ -277,22 +273,24 @@ export const PdfDocumentViewer: React.FC<PdfDocumentViewerProps> = ({ file, canD
         </div>
 
         {/* Zoom & Rotation */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2">
           <button
             onClick={handleZoomOut}
             disabled={scale <= 0.5 || pageRendering}
-            className="p-1 rounded bg-slate-850 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 transition-colors"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-850 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 transition-colors"
+            aria-label="Zoom out"
             title="Zoom out"
           >
             <ZoomOut className="h-4 w-4" />
           </button>
 
-          <span className="font-mono text-xs min-w-[42px] text-center">{Math.round(scale * 100)}%</span>
+          <span className="inline-flex h-8 min-w-12 items-center justify-center font-mono text-xs tabular-nums">{Math.round(scale * 100)}%</span>
 
           <button
             onClick={handleZoomIn}
             disabled={scale >= 4.0 || pageRendering}
-            className="p-1 rounded bg-slate-850 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 transition-colors"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-850 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 transition-colors"
+            aria-label="Zoom in"
             title="Zoom in"
           >
             <ZoomIn className="h-4 w-4" />
@@ -302,11 +300,13 @@ export const PdfDocumentViewer: React.FC<PdfDocumentViewerProps> = ({ file, canD
 
           <button
             onClick={handleFitWidth}
-            className={`p-1 rounded border transition-colors flex items-center justify-center ${
+            aria-pressed={isFitWidth}
+            className={`inline-flex h-8 w-8 shrink-0 rounded border transition-colors items-center justify-center ${
               isFitWidth
                 ? 'bg-blue-950 border-blue-800 text-blue-400'
                 : 'bg-slate-850 border-slate-800 hover:bg-slate-800 text-slate-200'
             }`}
+            aria-label="Fit to Width"
             title="Fit to Width"
           >
             <Maximize2 className="h-4 w-4" />
@@ -315,33 +315,15 @@ export const PdfDocumentViewer: React.FC<PdfDocumentViewerProps> = ({ file, canD
           <button
             onClick={handleRotate}
             disabled={pageRendering}
-            className="p-1 rounded bg-slate-850 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 transition-colors text-slate-300 hover:text-white"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-850 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 transition-colors text-slate-300 hover:text-white"
+            aria-label="Rotate Page Right (90°)"
             title="Rotate Page Right (90°)"
           >
             <RotateCw className="h-4 w-4" />
           </button>
 
-          <button
-            onClick={handleReset}
-            disabled={pageRendering}
-            className="p-1 rounded bg-slate-850 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 transition-colors text-slate-400 hover:text-slate-200"
-            title="Reset View"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-          </button>
         </div>
 
-        {/* Download Button */}
-        {canDownload && (
-          <button
-            onClick={() => onDownload(file)}
-            className="flex items-center space-x-1 rounded-lg bg-blue-600 hover:bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white transition-all shadow-md shadow-blue-950/20"
-            title="Download PDF document"
-          >
-            <Download className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Download</span>
-          </button>
-        )}
       </div>
 
       {/* PDF Viewport Canvas */}
