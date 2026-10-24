@@ -13,7 +13,7 @@ export function RecoveryPanel({ trash, versions, onRestored, disabled }: { trash
     finally { setBusy(false); }
   }
   const groups = [...new Map(trash.map(t => [t.batchId, t])).values()];
-  return <details className="max-w-7xl w-full mx-auto px-6 py-4 text-sm text-slate-300">
+  return <details className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-300">
     <summary className="cursor-pointer">Recovery and file history ({groups.length} deleted groups, {versions.length} file versions)</summary>
     {error && <p role="alert" className="text-red-300">{error}</p>}
     <p className="text-xs my-3">Restoring a deleted group restores its folders and files together. Content versions restore earlier file bytes and metadata; metadata versions restore earlier names, descriptions, locations, and permissions.</p>

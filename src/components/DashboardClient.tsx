@@ -1409,8 +1409,12 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       />
 
       {/* Main Content Body */}
+      {saveStatus === 'saving' && (
+        <div role="status" aria-live="polite" className="fixed bottom-4 right-4 z-[90] rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-xs text-slate-300 shadow-lg">
+          Saving changes…
+        </div>
+      )}
       <main id="main-content" tabIndex={-1} className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <div role="status" aria-live="polite" className="text-xs text-slate-400">{saveStatus === 'saving' ? 'Saving changes…' : saveStatus === 'failed' ? 'The save could not be confirmed. Review the latest state and retry if needed.' : 'All changes saved'}</div>
         {saveError && <div role="alert" className="text-sm text-red-300">{saveError} <button className="storage-button" onClick={() => reload().catch(e => setLoadError(e.message))}>Reload latest changes</button></div>}
         {loadError && (
           <div role="alert" className="rounded-lg border border-red-800 bg-red-950/40 p-4 text-sm text-red-200">
@@ -1739,7 +1743,6 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
         onDeleteComment={handleDeleteComment}
       />
 
-      {canManagePlatform && <RecoveryPanel trash={recovery.trash} versions={recovery.versions} onRestored={async () => { await reload(); }} disabled={saveStatus === 'saving'} />}
       {/* Admin / Manager Dashboard Drawer / Modal */}
       <AdminDashboard
         isOpen={isAdminDashboardOpen && (canManagePlatform || effectiveRole === 'manager')}
@@ -1777,6 +1780,9 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
           persistState({ auditLogs: [] }).catch(() => {});
         }}
         activeTabDefault={adminTabDefault}
+        recoveryPanel={canManagePlatform ? (
+          <RecoveryPanel trash={recovery.trash} versions={recovery.versions} onRestored={reload} disabled={saveStatus === 'saving'} />
+        ) : undefined}
       />
 
       {dialog && (

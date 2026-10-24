@@ -71,6 +71,7 @@ interface AdminDashboardProps {
   onDeleteAnnouncement?: (id: string) => void;
   onClearAuditLogs?: () => void;
   activeTabDefault?: AdminTab;
+  recoveryPanel?: React.ReactNode;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -100,6 +101,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDeleteAnnouncement,
   onClearAuditLogs,
   activeTabDefault = 'upload',
+  recoveryPanel,
 }) => {
   const dialogRef = useDialog(isOpen, onClose);
   const isManager = role === 'manager';
@@ -1040,6 +1042,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {/* 6. AUDIT LOGS TAB */}
               {activeTab === 'logs' && (
                 <div className="space-y-4 text-xs font-sans">
+                  {recoveryPanel}
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <h4 className="font-bold text-slate-200">
                       Audit Trail History ({
