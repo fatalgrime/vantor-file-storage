@@ -4,6 +4,8 @@ import { randomUUID, randomBytes, scryptSync, timingSafeEqual, createHash } from
 import { INITIAL_REPOSITORIES, INITIAL_HERO_CHANGELOG } from '../db';
 import { StateError } from '../mutations';
 import { AppState } from './policy';
+import { migrateRepositoryConfiguration } from '../repositories';
+import { equal } from '../mutations';
 
 export const initialState: AppState = {
   files: [], folders: [], repositories: INITIAL_REPOSITORIES, users: [], shares: [], comments: [],
@@ -32,8 +34,9 @@ export function ensureSchema() {
     // Retire plaintext legacy passwords before any response is returned.
     for (let attempt = 0; attempt < 10; attempt++) {
       const row = await readState();
-      if (!row.state.shares.some(s => s.password)) break;
-      const state = { ...row.state, shares: row.state.shares.map(s => {
+      const configured = migrateRepositoryConfiguration(row.state);
+      if (equal(configured, row.state) && !row.state.shares.some(s => s.password)) break;
+      const state = { ...configured, shares: row.state.shares.map(s => {
         if (!s.password) return s;
         const { password, ...rest } = s;
         return { ...rest, passwordHash: hashPassword(password) };

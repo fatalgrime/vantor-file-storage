@@ -39,7 +39,7 @@ import { detectFileType, formatBytes } from '../lib/utils';
 import { ALL_USER_ROLES } from '../lib/authorization';
 import { useToast } from './ToastProvider';
 import { formatFriendlyDate } from '../lib/dateUtils';
-import { TOTAL_STORAGE_CAPACITY_BYTES, MAX_SINGLE_FILE_BYTES, DEFAULT_REPOSITORY_ID } from '../lib/db';
+import { TOTAL_STORAGE_CAPACITY_BYTES, MAX_SINGLE_FILE_BYTES } from '../lib/db';
 import { CustomSelect } from './CustomSelect';
 
 export type AdminTab = 'upload' | 'folder' | 'announcements' | 'files' | 'logs' | 'users';
@@ -57,6 +57,7 @@ interface AdminDashboardProps {
   currentRepositoryId?: string;
   showRepositoryIndex?: boolean;
   currentUserId: string;
+  onSelectRepository?: (id: string) => void;
   onUploadFile: (newFile: Partial<VantorFile> & { blob?: Blob; versionOf?: string }) => Promise<void>;
   uploadProgress?: number | null;
   onCancelUpload?: () => void;
@@ -87,6 +88,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   currentRepositoryId = '',
   showRepositoryIndex = true,
   currentUserId,
+  onSelectRepository,
   onUploadFile,
   uploadProgress,
   onCancelUpload,
@@ -159,7 +161,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [announcementIsActive, setAnnouncementIsActive] = useState(true);
 
   const currentRepo = repositories.find(r => r.id === currentRepositoryId);
-  const currentRepoName = currentRepo?.name || 'Vantor Root Repository';
+  const currentRepoName = currentRepo?.name || 'Select a repository';
 
   const targetFolderOptions = [
     {
@@ -167,9 +169,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       label: `Root Directory (${currentRepoName})`,
       icon: <HardDrive className="h-3.5 w-3.5 text-blue-400" />
     },
-    ...folders.map((f) => {
-      const folderRepo = repositories.find(r => r.id === (f.repositoryId || DEFAULT_REPOSITORY_ID));
-      const repoName = folderRepo ? folderRepo.name : 'Default Repository';
+    ...folders.filter(f => f.repositoryId === currentRepositoryId).map((f) => {
+      const folderRepo = repositories.find(r => r.id === (f.repositoryId || ''));
+      const repoName = folderRepo ? folderRepo.name : 'Unknown Repository';
       const isSubfolder = Boolean(f.parentId);
       const displayLabel = isSubfolder
         ? `${f.name} (Subfolder — Repository: ${repoName})`
@@ -466,6 +468,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           )}
         </div>
 
+        {showRepositoryIndex && (activeTab === 'upload' || activeTab === 'folder') && (
+          <label className="px-6 pt-4 text-xs text-slate-300">Repository
+            <select aria-label="Repository" value={currentRepositoryId} disabled={isProcessingFile || isCreatingFolder} onChange={e => { onSelectRepository?.(e.target.value); setTargetFolderId('root'); setFolderTargetId('root'); }} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 p-2 text-white">
+              <option value="">Select a repository</option>
+              {repositories.map(repository => <option key={repository.id} value={repository.id}>{repository.name}</option>)}
+            </select>
+          </label>
+        )}
         {/* Tab Content Body */}
         <div className="p-6 overflow-y-auto flex-1">
             <>
@@ -579,7 +589,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="pt-2">
                     <button
                       type="submit"
-                      disabled={isProcessingFile}
+                      disabled={isProcessingFile || (!currentRepositoryId && !versionOf)}
                       className="w-full rounded-lg bg-blue-600 hover:bg-blue-500 py-2.5 text-xs font-bold text-white shadow-glow-blue transition-all flex items-center justify-center space-x-2"
                     >
                       <Upload className="h-4 w-4" />
@@ -642,7 +652,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="pt-3">
                     <button
                       type="submit"
-                      disabled={isCreatingFolder}
+                      disabled={isCreatingFolder || !currentRepositoryId}
                       className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-lg transition-all flex items-center justify-center space-x-2"
                     >
                       <FolderPlus className="h-4 w-4" />
@@ -1049,7 +1059,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         auditLogs.filter(log => {
                           if (adminLogFilter !== 'ALL' && log.action !== adminLogFilter) return false;
                           if (adminLogRepoFilter !== 'ALL') {
-                            const logRepo = log.repositoryId || DEFAULT_REPOSITORY_ID;
+                            const logRepo = log.repositoryId || '';
                             if (logRepo !== adminLogRepoFilter) return false;
                           }
                           return true;
@@ -1130,7 +1140,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       .filter(log => {
                         if (adminLogFilter !== 'ALL' && log.action !== adminLogFilter) return false;
                         if (adminLogRepoFilter !== 'ALL') {
-                          const logRepo = log.repositoryId || DEFAULT_REPOSITORY_ID;
+                          const logRepo = log.repositoryId || '';
                           if (logRepo !== adminLogRepoFilter) return false;
                         }
                         return true;
@@ -1157,7 +1167,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {auditLogs.filter(log => {
                       if (adminLogFilter !== 'ALL' && log.action !== adminLogFilter) return false;
                       if (adminLogRepoFilter !== 'ALL') {
-                        const logRepo = log.repositoryId || DEFAULT_REPOSITORY_ID;
+                        const logRepo = log.repositoryId || '';
                         if (logRepo !== adminLogRepoFilter) return false;
                       }
                       return true;

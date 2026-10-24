@@ -24,6 +24,8 @@ Locked accounts cannot read storage state, mutate metadata, upload, preview, or 
 
 ## Storage and concurrent edits
 
+No repository is seeded or designated as a default. New content requires an explicit repository selection. Repository URLs use stable slugs: Subsidiary Documents is `/dashboard/repositories/sub-documents` and Harvesta is `/dashboard/repositories/harvesta`. Existing internal IDs, files, permissions, comments, and links are preserved. Old ID-based repository URLs redirect to the canonical slug after authorized loading. On first use, an idempotent migration removes legacy default flags, assigns slugs, and records explicit ownership for older content that previously relied on the default fallback.
+
 On first use, the app applies idempotent, additive schema changes: a revision column, immutable upload manifests, share sessions, and password-attempt counters. Legacy share passwords are hashed with salted scrypt before any state response is returned. Back up the database before deploying schema changes. Deploy the new client and API together: the old whole-state PATCH protocol is deliberately rejected.
 
 The client sends individual record mutations with the previous visible record. The API compares those records against the current authorized view, validates permissions, and uses a database revision compare-and-swap to commit the complete operation atomically. Unrelated concurrent edits are preserved; conflicting edits return HTTP 409. Local requests are serialized. On failure the UI reloads server state, rolls back optimistic changes, and displays the error.

@@ -1,5 +1,4 @@
 import { VantorFile, VantorFolder, VantorRepository, AuditLog } from './types';
-import { DEFAULT_REPOSITORY_ID } from './db';
 
 /**
  * Parses an ISO date string or Date object into a valid Date object.
@@ -148,8 +147,8 @@ export function getRepositoryLastUpdated(
   let latestTime = 0;
   let latestIsoString = repository.updatedAt || repository.createdAt || new Date().toISOString();
 
-  const repoFiles = files.filter((f) => (f.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
-  const repoFolders = folders.filter((f) => (f.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
+  const repoFiles = files.filter((f) => (f.repositoryId || '') === repository.id);
+  const repoFolders = folders.filter((f) => (f.repositoryId || '') === repository.id);
   const itemNames = new Set([
     ...repoFiles.map((f) => f.name),
     ...repoFolders.map((f) => f.name),

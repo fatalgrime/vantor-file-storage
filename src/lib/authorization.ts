@@ -17,12 +17,12 @@ export const hasRepositoryAccess = (
 
   const repoId = repository.id;
   const hasFolderInvite = allFolders.some(
-    (f) => (f.repositoryId || 'repo-default') === repoId && f.collaborators?.some((c) => c.userId === userId)
+    (f) => (f.repositoryId || '') === repoId && f.collaborators?.some((c) => c.userId === userId)
   );
   if (hasFolderInvite) return true;
 
   const hasFileInvite = allFiles.some(
-    (f) => (f.repositoryId || 'repo-default') === repoId && f.collaborators?.some((c) => c.userId === userId)
+    (f) => (f.repositoryId || '') === repoId && f.collaborators?.some((c) => c.userId === userId)
   );
   if (hasFileInvite) return true;
 

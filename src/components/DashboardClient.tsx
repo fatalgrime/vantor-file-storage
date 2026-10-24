@@ -5,6 +5,7 @@ import { SignInButton, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useStorageState } from '../hooks/useStorageState';
 import { uploadFile } from '../lib/upload';
+import { findRepositoryByRoute, repositoryPath } from '../lib/repositories';
 import { RecoveryPanel } from './RecoveryPanel';
 import { Navbar } from './Navbar';
 import { formatBytes, formatRelativeTime, getRepositoryLastUpdated, matchesModifiedFilter } from '../lib/dateUtils';
@@ -34,7 +35,6 @@ import {
   hasRepositoryAccess,
   canEditItem,
 } from '../lib/authorization';
-import { DEFAULT_REPOSITORY_ID } from '../lib/db';
 import { VantorFile, VantorFolder, AuditLog, HeroChangelogData, UserRole, PermissionLevel, VantorRepository, VantorUser, Collaborator, ShareLink, Announcement, FileComment } from '../lib/types';
 
 interface PersistedState {
@@ -171,8 +171,8 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
         applyServerState(data);
         const currentRepositories = data.repositories || [];
         const availableRepositories = currentRepositories;
-        const requestedRepositoryExists = initialRepositoryId && availableRepositories.some((repository) => repository.id === initialRepositoryId);
-        setCurrentRepositoryId(requestedRepositoryExists ? initialRepositoryId : availableRepositories[0]?.id || '');
+        const requestedRepository = initialRepositoryId ? findRepositoryByRoute(availableRepositories, initialRepositoryId) : undefined;
+        setCurrentRepositoryId(requestedRepository?.id || '');
         const self = data.users.find(u => u.id === user?.id);
         setCurrentRole(self?.role || 'viewer');
         setLoadError('');
@@ -412,7 +412,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       setPreviewFile(result.item as VantorFile);
     } else {
       const suffix = result.kind === 'folder' ? `?folder=${encodeURIComponent(result.item.id)}` : '';
-      router.push(`/dashboard/repositories/${encodeURIComponent(result.repository.id)}${suffix}`);
+      router.push(`${repositoryPath(result.repository)}${suffix}`);
     }
   };
 
@@ -425,34 +425,38 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
   useEffect(() => {
     if (!showRepositoryIndex) return;
     if (visibleRepositories.some((repository) => repository.id === currentRepositoryId)) return;
-    const nextRepositoryId = visibleRepositories[0]?.id || DEFAULT_REPOSITORY_ID;
+    const nextRepositoryId = '';
     setCurrentRepositoryId(nextRepositoryId);
     setCurrentFolderId(null);
     setSelectedIds([]);
   }, [visibleRepositories, currentRepositoryId, showRepositoryIndex]);
 
   useEffect(() => {
-    if (initialRepositoryId && repositories.some((repository) => repository.id === initialRepositoryId)) {
-      setCurrentRepositoryId(initialRepositoryId);
+    if (!initialRepositoryId) return;
+    const repository = findRepositoryByRoute(repositories, initialRepositoryId);
+    if (repository) {
+      setCurrentRepositoryId(repository.id);
+      const canonicalPath = repositoryPath(repository);
+      if (window.location.pathname !== canonicalPath) router.replace(canonicalPath + window.location.search);
     }
   }, [initialRepositoryId, repositories]);
 
   const repositoryFolders = useMemo(() => {
-    return folders.filter((folder) => (folder.repositoryId || DEFAULT_REPOSITORY_ID) === currentRepositoryId && (currentRepository ? canViewRepository(currentRepository) : false));
+    return folders.filter((folder) => (folder.repositoryId || '') === currentRepositoryId && (currentRepository ? canViewRepository(currentRepository) : false));
   }, [folders, currentRepositoryId, currentRepository, effectiveRole, currentUserId]);
 
   const repositoryFiles = useMemo(() => {
-    return files.filter((file) => (file.repositoryId || DEFAULT_REPOSITORY_ID) === currentRepositoryId && (currentRepository ? canViewRepository(currentRepository) : false));
+    return files.filter((file) => (file.repositoryId || '') === currentRepositoryId && (currentRepository ? canViewRepository(currentRepository) : false));
   }, [files, currentRepositoryId, currentRepository, effectiveRole, currentUserId]);
 
   useEffect(() => {
     if (isLoading || !initialFolderId) return;
     const target = folders.find((folder) => folder.id === initialFolderId &&
-      (folder.repositoryId || DEFAULT_REPOSITORY_ID) === initialRepositoryId);
+      (folder.repositoryId || '') === currentRepositoryId);
     if (target && canReadItem(effectiveRole, currentUserId, target, folders, currentRepository)) {
       setCurrentFolderId(target.id);
     }
-  }, [isLoading, initialFolderId, initialRepositoryId]);
+  }, [isLoading, initialFolderId, initialRepositoryId, currentRepositoryId]);
 
   // Breadcrumb Trail Calculation
   const currentFolderPath = useMemo(() => {
@@ -672,7 +676,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     if (newFileData.versionOf && !replacement) throw new Error('The selected file is no longer available.');
     const destFolderId = replacement ? replacement.folderId : newFileData.folderId !== undefined ? newFileData.folderId : currentFolderId;
     const destFolder = destFolderId ? folders.find(f => f.id === destFolderId) : undefined;
-    const targetRepoId = replacement?.repositoryId || destFolder?.repositoryId || currentRepositoryId || DEFAULT_REPOSITORY_ID;
+    const targetRepoId = replacement?.repositoryId || destFolder?.repositoryId || currentRepositoryId || '';
     const destinationRepository = repositories.find(r => r.id === targetRepoId);
     const hasWriteAccess = replacement
       ? canEditItem(effectiveRole, currentUserId, replacement, folders, destinationRepository)
@@ -755,7 +759,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       throw new Error('You do not have permission to create a folder here.');
     }
 
-    const targetRepoId = currentRepositoryId || DEFAULT_REPOSITORY_ID;
+    const targetRepoId = currentRepositoryId || '';
 
     const newFolder: VantorFolder = {
       id: `folder-${Date.now()}`,
@@ -810,7 +814,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     const query = searchQuery.trim();
     const repository = repositories.find((item) => item.id === repositoryId);
     const suffix = query && repository && !matchesSearch(repository, query) ? `?q=${encodeURIComponent(query)}` : '';
-    router.push(`/dashboard/repositories/${repositoryId}${suffix}`);
+    if (repository) router.push(`${repositoryPath(repository)}${suffix}`);
   };
 
   const handleUpdateCurrentChangelog = (nextChangelog: HeroChangelogData) => {
@@ -918,10 +922,10 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     if (!canManagePlatform || dialog.confirmation !== dialog.repository.name) return;
 
     const nextRepositories = repositories.filter((repository) => repository.id !== dialog.repository.id);
-    const nextFiles = files.filter((file) => (file.repositoryId || DEFAULT_REPOSITORY_ID) !== dialog.repository.id);
-    const nextFolders = folders.filter((folder) => (folder.repositoryId || DEFAULT_REPOSITORY_ID) !== dialog.repository.id);
+    const nextFiles = files.filter((file) => (file.repositoryId || '') !== dialog.repository.id);
+    const nextFolders = folders.filter((folder) => (folder.repositoryId || '') !== dialog.repository.id);
     const nextLogs = [createAuditLog('DELETE', dialog.repository.name, 'folder', 'Deleted repository and all contained content'), ...auditLogs];
-    const nextRepositoryId = nextRepositories[0]?.id || DEFAULT_REPOSITORY_ID;
+    const nextRepositoryId = '';
 
     setRepositories(nextRepositories);
     setFiles(nextFiles);
@@ -1018,7 +1022,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       setFolders(nextFolders);
       setFiles(nextFiles);
       if (folderToDelete) {
-        const nextRepositories = touchRepository(folderToDelete.repositoryId || DEFAULT_REPOSITORY_ID);
+        const nextRepositories = touchRepository(folderToDelete.repositoryId || '');
         const nextLogs = [createAuditLog('DELETE', folderToDelete.name, 'folder', `Deleted folder and subcontents`), ...auditLogs];
         setAuditLogs(nextLogs);
         setRepositories(nextRepositories);
@@ -1029,7 +1033,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       const nextFiles = files.filter((f) => f.id !== id);
       setFiles(nextFiles);
       if (fileToDelete) {
-        const nextRepositories = touchRepository(fileToDelete.repositoryId || DEFAULT_REPOSITORY_ID);
+        const nextRepositories = touchRepository(fileToDelete.repositoryId || '');
         const nextLogs = [createAuditLog('DELETE', fileToDelete.name, 'file', `Deleted file`), ...auditLogs];
         setAuditLogs(nextLogs);
         setRepositories(nextRepositories);
@@ -1039,7 +1043,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
   };
 
   const handleRenameItem = (item: VantorFile | VantorFolder, isFolder: boolean) => {
-    const repositoryId = 'repositoryId' in item ? item.repositoryId || DEFAULT_REPOSITORY_ID : DEFAULT_REPOSITORY_ID;
+    const repositoryId = 'repositoryId' in item ? item.repositoryId || '' : '';
     const repository = repositories.find((candidate) => candidate.id === repositoryId) || currentRepository;
 
     const hasEditAccess = canEditItem(effectiveRole, currentUserId, item, folders, repository);
@@ -1069,7 +1073,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       const nextFolders = folders.map((folder) =>
         folder.id === dialog.item.id ? { ...folder, name: nextName } : folder
       );
-      const nextRepositories = touchRepository((dialog.item as VantorFolder).repositoryId || DEFAULT_REPOSITORY_ID);
+      const nextRepositories = touchRepository((dialog.item as VantorFolder).repositoryId || '');
       const nextLogs = [createAuditLog('RENAME', nextName, 'folder', `Renamed folder from "${dialog.item.name}" to "${nextName}"`), ...auditLogs];
       setFolders(nextFolders);
       setAuditLogs(nextLogs);
@@ -1079,7 +1083,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       const nextFiles = files.map((file) =>
         file.id === dialog.item.id ? { ...file, name: nextName } : file
       );
-      const nextRepositories = touchRepository((dialog.item as VantorFile).repositoryId || DEFAULT_REPOSITORY_ID);
+      const nextRepositories = touchRepository((dialog.item as VantorFile).repositoryId || '');
       const nextLogs = [createAuditLog('RENAME', nextName, 'file', `Renamed file from "${dialog.item.name}" to "${nextName}"`), ...auditLogs];
       setFiles(nextFiles);
       setAuditLogs(nextLogs);
@@ -1104,14 +1108,14 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
   };
 
   const getMoveDestinations = (item: VantorFile | VantorFolder, isFolder: boolean, targetRepoId?: string) => {
-    const repoId = targetRepoId || item.repositoryId || DEFAULT_REPOSITORY_ID;
-    const repoFolders = folders.filter((f) => (f.repositoryId || DEFAULT_REPOSITORY_ID) === repoId);
+    const repoId = targetRepoId || item.repositoryId || '';
+    const repoFolders = folders.filter((f) => (f.repositoryId || '') === repoId);
 
     if (!isFolder) {
       return repoFolders;
     }
 
-    const itemRepoId = item.repositoryId || DEFAULT_REPOSITORY_ID;
+    const itemRepoId = item.repositoryId || '';
     if (itemRepoId !== repoId) {
       return repoFolders;
     }
@@ -1132,7 +1136,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
   };
 
   const handleMoveItem = (item: VantorFile | VantorFolder, isFolder: boolean) => {
-    const repositoryId = 'repositoryId' in item ? item.repositoryId || DEFAULT_REPOSITORY_ID : DEFAULT_REPOSITORY_ID;
+    const repositoryId = 'repositoryId' in item ? item.repositoryId || '' : '';
     const repository = repositories.find((candidate) => candidate.id === repositoryId) || currentRepository;
 
     const hasEditAccess = canEditItem(effectiveRole, currentUserId, item, folders, repository);
@@ -1175,7 +1179,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     const isFolder = dialog.isFolder;
     const item = dialog.item;
     const destName = destFolder ? destFolder.name : 'Root';
-    const oldRepoId = 'repositoryId' in item ? item.repositoryId || DEFAULT_REPOSITORY_ID : DEFAULT_REPOSITORY_ID;
+    const oldRepoId = 'repositoryId' in item ? item.repositoryId || '' : '';
 
     if (isFolder) {
       const descendantFolderIds = new Set<string>();
@@ -1338,7 +1342,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       role: effectiveRole,
       timestamp: new Date().toISOString(),
       details,
-      repositoryId: repositoryId || currentRepositoryId || DEFAULT_REPOSITORY_ID,
+      repositoryId: repositoryId || currentRepositoryId || '',
     };
     return newLog;
   };
@@ -1492,8 +1496,8 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
                   </thead>
                   <tbody className="divide-y divide-[#1e3059]/40 text-slate-200">
                     {displayedRepositories.map((repository) => {
-                      const repositoryFilesForCard = files.filter((file) => (file.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
-                      const repositoryFoldersForCard = folders.filter((folder) => (folder.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
+                      const repositoryFilesForCard = files.filter((file) => (file.repositoryId || '') === repository.id);
+                      const repositoryFoldersForCard = folders.filter((folder) => (folder.repositoryId || '') === repository.id);
                       const repositoryFileCount = repositoryFilesForCard.length;
                       const repositoryFolderCount = repositoryFoldersForCard.length;
                       const repositoryItemNames = new Set([
@@ -1547,8 +1551,8 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
             ) : (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 {displayedRepositories.map((repository) => {
-                  const repositoryFilesForCard = files.filter((file) => (file.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
-                  const repositoryFoldersForCard = folders.filter((folder) => (folder.repositoryId || DEFAULT_REPOSITORY_ID) === repository.id);
+                  const repositoryFilesForCard = files.filter((file) => (file.repositoryId || '') === repository.id);
+                  const repositoryFoldersForCard = folders.filter((folder) => (folder.repositoryId || '') === repository.id);
                   const repositoryFileCount = repositoryFilesForCard.length;
                   const repositoryFolderCount = repositoryFoldersForCard.length;
                   const repositoryItemNames = new Set([
@@ -1735,7 +1739,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
         userId={currentUserId}
         userName={displayName}
         allFolders={folders}
-        repository={repositories.find((repo) => repo.id === (previewFile?.repositoryId || DEFAULT_REPOSITORY_ID))}
+        repository={repositories.find((repo) => repo.id === (previewFile?.repositoryId || ''))}
         comments={comments}
         users={managedUsers}
         onAddComment={handleAddComment}
@@ -1757,6 +1761,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
         currentRepositoryId={currentRepositoryId}
         showRepositoryIndex={showRepositoryIndex}
         currentUserId={user?.id || ''}
+        onSelectRepository={(id) => { setCurrentRepositoryId(id); setCurrentFolderId(null); }}
         onUploadFile={handleUploadFile}
         uploadProgress={uploadProgress}
         onCancelUpload={() => uploadController.current?.abort()}

@@ -21,8 +21,8 @@ const { FileBrowser } = require('../src/components/FileBrowser.tsx');
 const { SearchResults } = require('../src/components/SearchResults.tsx');
 const { Pagination } = require('../src/components/Pagination.tsx');
 const repo = { id: 'repo-default', name: 'Design', description: '', assignedRoles: ['member'], assignedUserIds: [] };
-const folder = (id, overrides = {}) => ({ id, name: id, parentId: null, description: '', permissionLevel: 'authenticated', allowedRoles: [], createdBy: 'User', formattedSize: '0 B', totalSize: 0, ...overrides });
-const file = (id, overrides = {}) => ({ id, name: id, folderId: null, description: '', tags: [], fileType: 'PDF Document', extension: 'pdf', permissionLevel: 'authenticated', allowedRoles: [], formattedSize: '0 B', size: 0, ...overrides });
+const folder = (id, overrides = {}) => ({ id, repositoryId: 'repo-default', name: id, parentId: null, description: '', permissionLevel: 'authenticated', allowedRoles: [], createdBy: 'User', formattedSize: '0 B', totalSize: 0, ...overrides });
+const file = (id, overrides = {}) => ({ id, repositoryId: 'repo-default', name: id, folderId: null, description: '', tags: [], fileType: 'PDF Document', extension: 'pdf', permissionLevel: 'authenticated', allowedRoles: [], formattedSize: '0 B', size: 0, ...overrides });
 
 test('search finds nested files with a complete repository path and ignores case/whitespace', () => {
   const folders = [folder('Brand'), folder('Guidelines', { parentId: 'Brand' })];

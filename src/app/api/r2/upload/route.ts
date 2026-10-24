@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const { state } = await readState();
     const user = actor(state, userId);
     const params = new URL(request.url).searchParams;
-    const repositoryId = params.get('repositoryId') || 'repo-default', folderId = params.get('folderId') || null;
+    const repositoryId = params.get('repositoryId') || '', folderId = params.get('folderId') || null;
     if (!writableDestination(state, user, repositoryId, folderId)) throw new StateError('You cannot upload to this location.', 403);
     // Raw binary requests allow limits and cancellation without buffering a multipart envelope.
     const size = Number(request.headers.get('content-length') || 0);

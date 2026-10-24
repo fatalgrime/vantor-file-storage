@@ -18,7 +18,7 @@ export function getSearchResults(query: string, repositories: VantorRepository[]
     if (matchesSearch(repository, query)) results.push({ item: repository, kind: 'repository', repository, path: 'Repository' });
   }
   for (const item of [...folders, ...files]) {
-    const repository = accessible.get(item.repositoryId || 'repo-default');
+    const repository = accessible.get(item.repositoryId || '');
     if (!repository || !canReadItem(role, userId, item, folders, repository) || !matchesSearch(item, query)) continue;
     const parts: string[] = [];
     const seen = new Set<string>();
@@ -26,7 +26,7 @@ export function getSearchResults(query: string, repositories: VantorRepository[]
     while (parentId && !seen.has(parentId)) {
       seen.add(parentId);
       const parent = folderMap.get(parentId);
-      if (!parent || (parent.repositoryId || 'repo-default') !== repository.id) break;
+      if (!parent || (parent.repositoryId || '') !== repository.id) break;
       parts.unshift(canReadItem(role, userId, parent, folders, repository) ? parent.name : 'Restricted folder');
       parentId = parent.parentId;
     }

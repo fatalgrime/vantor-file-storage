@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { actor, validateHierarchy, visibleState } from '../../../../lib/server/policy';
 import { StateError } from '../../../../lib/mutations';
 import { compareAndSwap, ensureSchema, errorResponse, jsonBody, newId, readState } from '../../../../lib/server/store';
+import { assignRepositorySlugs } from '../../../../lib/repositories';
 
 export async function POST(request: Request) {
   try {
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
         next.versions = [...state.versions!, { id: newId('version'), fileId: current.id, kind: contentVersion ? 'content' : 'metadata', record: { ...current, content: contentVersion ? current.content : undefined }, createdAt: new Date().toISOString(), createdBy: userId }];
         next.files = state.files.map(f => f.id === current.id ? { ...entry.record, ...(contentVersion ? {} : { content: f.content, url: f.url, r2Key: (f as any).r2Key, storageId: (f as any).storageId, size: f.size, formattedSize: f.formattedSize, mimeType: f.mimeType, extension: f.extension, fileType: f.fileType, originalName: f.originalName }), downloadCount: f.downloadCount, updatedAt: new Date().toISOString() } : f);
       }
+      next.repositories = assignRepositorySlugs(next.repositories);
       validateHierarchy(next);
       const counts = new Map<string, number>();
       next.versions = [...(next.versions || [])].reverse().filter(v => { const count = (counts.get(v.fileId) || 0) + 1; counts.set(v.fileId, count); return count <= 20; }).reverse();

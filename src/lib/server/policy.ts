@@ -13,7 +13,7 @@ export function actor(state: AppState, userId: string) {
   if (!user || user.locked) throw new StateError('Your account does not have access.', 403);
   return user;
 }
-export const repoFor = (state: AppState, item: { repositoryId?: string }) => state.repositories.find(r => r.id === (item.repositoryId || 'repo-default'));
+export const repoFor = (state: AppState, item: { repositoryId?: string }) => state.repositories.find(r => r.id === (item.repositoryId || ''));
 export function readable(state: AppState, user: VantorUser, item: VantorFile | VantorFolder) {
   const repo = repoFor(state, item);
   return Boolean(repo && canReadItem(user.role, user.id, item, state.folders, repo));
@@ -27,7 +27,7 @@ export function writableDestination(state: AppState, user: VantorUser, repositor
   if (!repo) return false;
   if (!folderId) return canEditRepository(user.role, user.id, repo);
   const folder = state.folders.find(f => f.id === folderId);
-  return Boolean(folder && (folder.repositoryId || 'repo-default') === repositoryId && editable(state, user, folder));
+  return Boolean(folder && (folder.repositoryId || '') === repositoryId && editable(state, user, folder));
 }
 export function safeFile(file: VantorFile, shareId?: string): VantorFile {
   const { content, url, r2Key, storageId, uploadId, ...metadata } = file as VantorFile & { r2Key?: string; storageId?: string; uploadId?: string };
@@ -71,6 +71,7 @@ function validateRecord(collection: string, record: any) {
   if (record.collaborators !== undefined && (!Array.isArray(record.collaborators) || record.collaborators.length > 1000 || record.collaborators.some((c: any) => !c || typeof c.userId !== 'string' || !['viewer', 'editor'].includes(c.role) || (c.name !== undefined && typeof c.name !== 'string') || (c.email !== undefined && typeof c.email !== 'string')))) throw new StateError('Invalid collaborators.');
   for (const field of ['size', 'totalSize', 'itemCount', 'downloadCount', 'viewsCount', 'downloadsCount', 'accessCount']) if (record[field] !== undefined && (!Number.isSafeInteger(record[field]) || record[field] < 0)) throw new StateError(`Invalid ${field}.`);
   if (['files', 'folders', 'repositories'].includes(collection) && (typeof record.name !== 'string' || !record.name.trim() || record.name.length > 255)) throw new StateError('Invalid name.');
+  if (collection === 'repositories' && record.slug !== undefined && (typeof record.slug !== 'string' || record.slug.length > 200 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(record.slug))) throw new StateError('Invalid repository slug.');
   if (collection === 'files' && (typeof record.mimeType !== 'string' || !record.mimeType || record.mimeType.length > 255 || /[\r\n]/.test(record.mimeType))) throw new StateError('Invalid MIME type.');
   if (collection === 'announcements') {
     if (typeof record.isActive !== 'boolean' || !['info', 'warning', 'alert', 'success'].includes(record.type)) throw new StateError('Invalid announcement.');
@@ -139,7 +140,7 @@ export function validateMutations(state: AppState, userId: string, mutations: Mu
       if (typeof next.name !== 'string' || !next.name.trim() || next.name.length > 255 || !['public', 'authenticated', 'private', 'role_restricted'].includes(next.permissionLevel) || !Array.isArray(next.allowedRoles) || next.allowedRoles.some((r: UserRole) => !['admin', 'manager', 'member', 'viewer'].includes(r))) throw new StateError('Invalid item metadata.');
       if (old && !admin && policyFields.some(k => !equal((old as any)[k] ?? [], next[k] ?? []))) throw new StateError('Only administrators can change access policies.', 403);
       const destination = m.collection === 'files' ? next.folderId : next.parentId;
-      if ((!old || (old.repositoryId || 'repo-default') !== (next.repositoryId || 'repo-default') || (m.collection === 'files' ? (old as VantorFile).folderId : (old as VantorFolder).parentId) !== destination) && !writableDestination(destinationState, user, next.repositoryId || 'repo-default', destination || null)) throw new StateError('You cannot write to that destination.', 403);
+      if ((!old || (old.repositoryId || '') !== (next.repositoryId || '') || (m.collection === 'files' ? (old as VantorFile).folderId : (old as VantorFolder).parentId) !== destination) && !writableDestination(destinationState, user, next.repositoryId || '', destination || null)) throw new StateError('You cannot write to that destination.', 403);
       if (m.collection === 'files' && old && ['content', 'r2Key', 'url', 'storageId', ...(next.uploadId ? [] : ['size', 'mimeType'])].some(k => !equal((m.before as any)?.[k], next[k]))) throw new StateError('Upload new content before changing the file.');
       if (m.collection === 'files' && next && (!Number.isFinite(next.size) || next.size < 0 || next.size > 50 * 1024 * 1024)) throw new StateError('Invalid file size.');
     }
@@ -149,7 +150,7 @@ export function validateHierarchy(state: AppState) {
   const repoIds = new Set(state.repositories.map(r => r.id));
   const folders = new Map(state.folders.map(f => [f.id, f]));
   for (const item of [...state.files, ...state.folders]) {
-    const repo = item.repositoryId || 'repo-default';
+    const repo = item.repositoryId || '';
     if (!repoIds.has(repo)) throw new StateError('Repository does not exist.');
     let id = 'folderId' in item ? item.folderId : item.parentId;
     const seen = new Set<string>('parentId' in item ? [item.id] : []);
@@ -157,7 +158,7 @@ export function validateHierarchy(state: AppState) {
       if (seen.has(id)) throw new StateError('Folders cannot contain a cycle.');
       seen.add(id);
       const folder = folders.get(id);
-      if (!folder || (folder.repositoryId || 'repo-default') !== repo) throw new StateError('Folder must belong to the same repository.');
+      if (!folder || (folder.repositoryId || '') !== repo) throw new StateError('Folder must belong to the same repository.');
       id = folder.parentId;
     }
   }

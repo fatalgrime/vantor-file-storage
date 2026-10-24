@@ -3,6 +3,7 @@ import { applyMutations, equal, Mutation, StateError } from '../../../lib/mutati
 import { actor, AppState, safeFile, validateHierarchy, validateMutations, visibleState } from '../../../lib/server/policy';
 import { compareAndSwap, database, ensureSchema, errorResponse, hashPassword, jsonBody, newId, readState, registerUser } from '../../../lib/server/store';
 import { TOTAL_STORAGE_CAPACITY_BYTES } from '../../../lib/db';
+import { assignRepositorySlugs } from '../../../lib/repositories';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -49,7 +50,7 @@ export async function PATCH(request: Request) {
             if (typeof uploadId !== 'string') throw new StateError('Invalid upload reference.');
             const uploads = await database()`SELECT * FROM vantor_uploads WHERE file_id = ${uploadId} AND owner_id = ${userId}`;
             const upload = uploads[0];
-            if (!upload || !upload.completed || upload.repository_id !== (next.repositoryId || 'repo-default') || (upload.folder_id || null) !== (next.folderId || null)) throw new StateError('Upload this file to the selected destination before saving it.', 403);
+            if (!upload || !upload.completed || upload.repository_id !== (next.repositoryId || '') || (upload.folder_id || null) !== (next.folderId || null)) throw new StateError('Upload this file to the selected destination before saving it.', 403);
             if (upload.attached) throw new StateError('This upload is already attached to a file version.', 409);
             const alreadyAttached = [...state.files, ...(state.trash || []).filter(t => t.collection === 'files').map(t => t.record), ...(state.versions || []).map(v => v.record)].some(f => f.id === uploadId || f.storageId === uploadId);
             if (alreadyAttached) throw new StateError('This upload is already attached to a file version.', 409);
@@ -67,18 +68,19 @@ export async function PATCH(request: Request) {
         translated.push({ ...m, before: old, after: next });
       }
       const next = applyMutations(state, translated) as AppState;
+      next.repositories = assignRepositorySlugs(next.repositories);
       for (const [key, change] of Object.entries(metadata) as [string, any][]) next[key] = change.after;
       const removedRepos = new Set(state.repositories.filter(r => !next.repositories.some(n => n.id === r.id)).map(r => r.id));
       const removedFolders = new Set(state.folders.filter(f => !next.folders.some(n => n.id === f.id)).map(f => f.id));
       let expanded = true;
       while (expanded) {
         expanded = false;
-        for (const folder of next.folders) if (removedRepos.has(folder.repositoryId || 'repo-default') || (folder.parentId && removedFolders.has(folder.parentId))) {
+        for (const folder of next.folders) if (removedRepos.has(folder.repositoryId || '') || (folder.parentId && removedFolders.has(folder.parentId))) {
           if (!removedFolders.has(folder.id)) { removedFolders.add(folder.id); expanded = true; }
         }
       }
-      next.folders = next.folders.filter(f => !removedFolders.has(f.id) && !removedRepos.has(f.repositoryId || 'repo-default'));
-      next.files = next.files.filter(f => !removedRepos.has(f.repositoryId || 'repo-default') && !(f.folderId && removedFolders.has(f.folderId)));
+      next.folders = next.folders.filter(f => !removedFolders.has(f.id) && !removedRepos.has(f.repositoryId || ''));
+      next.files = next.files.filter(f => !removedRepos.has(f.repositoryId || '') && !(f.folderId && removedFolders.has(f.folderId)));
       next.shares = next.shares.filter(s => (s.itemType === 'file' ? next.files : next.folders).some(i => i.id === s.itemId));
       validateHierarchy(next);
       const batchId = newId('deletion');

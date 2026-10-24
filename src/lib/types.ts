@@ -66,6 +66,7 @@ export interface VantorFolder {
 
 export interface VantorRepository {
   id: string;
+  slug?: string;
   name: string;
   description: string;
   createdAt: string;

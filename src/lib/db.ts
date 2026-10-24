@@ -15,20 +15,8 @@ export const INITIAL_HERO_CHANGELOG: HeroChangelogData = {
   releases: []
 };
 
-export const DEFAULT_REPOSITORY_ID = 'repo-default';
-
-export const INITIAL_REPOSITORIES: VantorRepository[] = [
-  {
-    id: DEFAULT_REPOSITORY_ID,
-    name: 'Vantor Root Repository',
-    description: 'Default root storage workspace',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-    createdBy: 'System Operator',
-    assignedUserIds: [],
-    assignedRoles: ['admin', 'manager', 'member', 'viewer'],
-  },
-];
+// Repositories are created explicitly; none is seeded or designated as a default.
+export const INITIAL_REPOSITORIES: VantorRepository[] = [];
 
 export const INITIAL_USERS: VantorUser[] = [];
 
