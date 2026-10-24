@@ -119,7 +119,7 @@ export async function normalizeImageOrientation(
       }
     }
 
-    let orientation = arrayBuffer ? getExifOrientation(arrayBuffer) : 1;
+    const orientation = arrayBuffer ? getExifOrientation(arrayBuffer) : 1;
 
     if (orientation <= 1) {
       return imageSrc; // Already upright (Standard EXIF 1)

@@ -40,7 +40,7 @@ export default function PublicSharePage() {
   const [passwordRequired, setPasswordRequired] = useState(false);
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
-  const viewLoggedRef = useRef(false);
+  const initialShareRef = useRef('');
 
   // Share link meta
   const [linkLabel, setLinkLabel] = useState('');
@@ -66,14 +66,12 @@ export default function PublicSharePage() {
     try {
       setLoading(true);
 
-      let url = `/api/public/share/${shareId}`;
-      const queryParams: string[] = [];
-      if (enteredPassword) queryParams.push(`password=${encodeURIComponent(enteredPassword)}`);
-      if (subfolderId) queryParams.push(`subfolderId=${encodeURIComponent(subfolderId)}`);
-      if (queryParams.length > 0) url += `?${queryParams.join('&')}`;
-
-      const res = await fetch(url);
-      const data = await res.json().catch(() => null);
+      const res = await fetch('/api/public/share/' + shareId, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: enteredPassword, subfolderId }),
+      });
+      let data = await res.json().catch(() => null);
+      if (res.status === 401) data = { ...data, passwordRequired: true, itemType };
 
       if (data?.passwordRequired) {
         setPasswordRequired(true);
@@ -123,16 +121,6 @@ export default function PublicSharePage() {
         }
       }
 
-      // Log view count increment (silently)
-      if (!viewLoggedRef.current) {
-        viewLoggedRef.current = true;
-        await fetch(`/api/public/share/${shareId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: enteredPassword, action: 'view' }),
-        }).catch(e => console.error("Metrics view error", e));
-      }
-
       setLoading(false);
     } catch (err: any) {
       console.error(err);
@@ -142,7 +130,8 @@ export default function PublicSharePage() {
   };
 
   useEffect(() => {
-    if (shareId) {
+    if (shareId && initialShareRef.current !== shareId) {
+      initialShareRef.current = shareId;
       fetchShareData();
     }
   }, [shareId]);
@@ -151,17 +140,17 @@ export default function PublicSharePage() {
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
-    if (!password.trim()) {
+    if (!password) {
       addToast({
         type: 'warning',
         title: 'Password Required',
-        message: 'Please enter a password to decrypt this file.',
+        message: 'Please enter a password to open this file.',
       });
       return;
     }
 
     // Test login
-    fetchShareData(password.trim());
+    fetchShareData(password);
   };
 
   // Download Trigger
@@ -169,31 +158,8 @@ export default function PublicSharePage() {
     if (!allowDownload) return;
 
     try {
-      // Record download count metric
-      await fetch(`/api/public/share/${shareId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, action: 'download' }),
-      }).catch(e => console.error("Metrics download error", e));
-
-      // Initiate download
-      let dlUrl = '';
-      let isTempBlob = false;
-
-      if (fileToDownload.content?.startsWith('data:')) {
-        dlUrl = fileToDownload.content;
-      } else if (fileToDownload.url) {
-        dlUrl = fileToDownload.url;
-      } else if (fileToDownload.content) {
-        const blob = new Blob([fileToDownload.content], { type: fileToDownload.mimeType });
-        dlUrl = URL.createObjectURL(blob);
-        isTempBlob = true;
-      } else {
-        const blob = new Blob([fileToDownload.description || ''], { type: fileToDownload.mimeType || 'text/plain' });
-        dlUrl = URL.createObjectURL(blob);
-        isTempBlob = true;
-      }
-
+      const dlUrl = '/api/public/files/' + encodeURIComponent(fileToDownload.id) + '?shareId=' + encodeURIComponent(shareId) + '&download=1';
+      const isTempBlob = false;
       const a = document.createElement('a');
       a.href = dlUrl;
       a.download = fileToDownload.name;
@@ -269,14 +235,14 @@ export default function PublicSharePage() {
             <Lock className="h-5 w-5" />
           </div>
           <h1 className="text-base font-bold text-white">{linkLabel}</h1>
-          <p className="mt-1.5 text-xs text-slate-400">This share link is password-protected. Enter the password below to decrypt and view the shared {itemType}.</p>
+          <p className="mt-1.5 text-xs text-slate-400">This share link is password-protected. Enter the password below to view the shared {itemType}.</p>
 
           <form onSubmit={handlePasswordSubmit} className="mt-5 space-y-3">
             <div className="relative">
               <Key className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
               <input
                 type="password"
-                placeholder="Enter password to decrypt..."
+                placeholder="Enter password..."
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);

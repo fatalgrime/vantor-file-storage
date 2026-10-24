@@ -29,6 +29,7 @@ import { CustomSelect } from './CustomSelect';
 interface AccessControlModalProps {
   item: VantorFile | VantorFolder | null;
   isFolder: boolean;
+  canManagePolicy: boolean;
   onClose: () => void;
   onSavePermissions: (
     id: string,
@@ -37,16 +38,17 @@ interface AccessControlModalProps {
     isFolder: boolean,
     collaborators: Collaborator[],
     propagateToChildren: boolean
-  ) => void;
+  ) => Promise<void>;
   users: VantorUser[];
   currentUserId: string;
   shares: ShareLink[];
-  onSaveShares: (shares: ShareLink[]) => void;
+  onSaveShares: (shares: ShareLink[]) => Promise<void>;
 }
 
 export const AccessControlModal: React.FC<AccessControlModalProps> = ({
   item,
   isFolder,
+  canManagePolicy,
   onClose,
   onSavePermissions,
   users,
@@ -57,7 +59,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
   const dialogRef = useDialog(Boolean(item), onClose);
   if (!item) return null;
 
-  const [activeTab, setActiveTab] = useState<'policy' | 'share' | 'links'>('policy');
+  const [activeTab, setActiveTab] = useState<'policy' | 'share' | 'links'>(canManagePolicy ? 'policy' : 'links');
   const [permissionLevel, setPermissionLevel] = useState<PermissionLevel>(item.permissionLevel);
   const [selectedRoles, setSelectedRoles] = useState<UserRole[]>(item.allowedRoles || ['admin']);
   const [collaborators, setCollaborators] = useState<Collaborator[]>(item.collaborators || []);
@@ -69,6 +71,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
   const [linkLabel, setLinkLabel] = useState('');
   const [allowDownload, setAllowDownload] = useState(true);
   const [oneTimeOnly, setOneTimeOnly] = useState(false);
+  const [maxAccessCount, setMaxAccessCount] = useState('');
   const [usePassword, setUsePassword] = useState(false);
   const [password, setPassword] = useState('');
   const [expirationType, setExpirationType] = useState<'never' | '1h' | '1d' | '7d' | '30d' | 'custom'>('never');
@@ -107,8 +110,8 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
     setCollaborators(collaborators.filter((c) => c.userId !== userId));
   };
 
-  const handleSave = () => {
-    onSavePermissions(item.id, permissionLevel, selectedRoles, isFolder, collaborators, propagateToChildren);
+  const handleSave = async () => {
+    try { await onSavePermissions(item.id, permissionLevel, selectedRoles, isFolder, collaborators, propagateToChildren); } catch (e) { addToast({ type: 'error', title: 'Permissions were not saved', message: e instanceof Error ? e.message : 'Try again.' }); return; }
     addToast({
       type: 'success',
       title: 'Permissions saved',
@@ -118,11 +121,15 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
   };
 
   // Share Links Handlers
-  const handleCreateShareLink = (e: React.FormEvent) => {
+  const handleCreateShareLink = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (usePassword && !password) {
+      addToast({ type: 'error', title: 'Password required', message: 'Enter a password or turn off password protection.' });
+      return;
+    }
 
     // Generate unique random share link ID
-    const shareId = 'share-' + Math.random().toString(36).substring(2, 11) + Math.random().toString(36).substring(2, 11);
+    const shareId = 'share-' + crypto.randomUUID();
 
     let expiresAt: string | undefined = undefined;
     const now = Date.now();
@@ -143,6 +150,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
       permission: allowDownload ? 'edit' : 'view',
       allowDownload,
       oneTimeOnly,
+      maxAccessCount: maxAccessCount ? Number(maxAccessCount) : undefined,
       selfDestructed: false,
       password: usePassword && password ? password : undefined,
       expiresAt,
@@ -152,7 +160,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
       downloadsCount: 0,
     };
 
-    onSaveShares([...shares, newLink]);
+    try { await onSaveShares([...shares, newLink]); } catch (e) { addToast({ type: 'error', title: 'Share was not saved', message: e instanceof Error ? e.message : 'Try again.' }); return; }
     addToast({
       type: 'success',
       title: 'Share link generated',
@@ -163,14 +171,15 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
     setLinkLabel('');
     setAllowDownload(true);
     setOneTimeOnly(false);
+    setMaxAccessCount('');
     setUsePassword(false);
     setPassword('');
     setExpirationType('never');
     setCustomExpirationDate('');
   };
 
-  const handleRevokeShareLink = (linkId: string) => {
-    onSaveShares(shares.filter(s => s.id !== linkId));
+  const handleRevokeShareLink = async (linkId: string) => {
+    try { await onSaveShares(shares.filter(s => s.id !== linkId)); } catch (e) { addToast({ type: 'error', title: 'Share was not revoked', message: e instanceof Error ? e.message : 'Try again.' }); return; }
     addToast({
       type: 'info',
       title: 'Share link revoked',
@@ -219,6 +228,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
         {/* Tab Navigation */}
         <div className="flex border-b border-[#1e3059] bg-[#080e20] text-xs font-semibold flex-shrink-0">
           <button
+            disabled={!canManagePolicy}
             onClick={() => setActiveTab('policy')}
             className={`px-5 py-3 border-b-2 transition-all ${activeTab === 'policy'
               ? 'border-blue-500 text-blue-400 bg-blue-950/20'
@@ -228,6 +238,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
             General Policy
           </button>
           <button
+            disabled={!canManagePolicy}
             onClick={() => setActiveTab('share')}
             className={`px-5 py-3 border-b-2 transition-all ${activeTab === 'share'
               ? 'border-blue-500 text-blue-400 bg-blue-950/20'
@@ -263,7 +274,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                     <Globe className="h-5 w-5 text-emerald-400 mt-0.5 flex-shrink-0" />
                     <div>
                       <h4 className="font-bold text-white text-xs">Public</h4>
-                      <p className="text-[11px] text-slate-400">All authenticated users can view and download.</p>
+                      <p className="text-[11px] text-slate-400">Authenticated users with repository access can view and download.</p>
                     </div>
                   </div>
 
@@ -438,6 +449,10 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
             <div className="space-y-6">
               {/* Generate New Link Form */}
               <form onSubmit={handleCreateShareLink} className="bg-[#090f22]/90 p-5 border border-slate-800 rounded-xl space-y-4 shadow-xl">
+                <label className="block text-xs text-slate-300">Maximum browser sessions (optional)
+                  <input type="number" min="1" step="1" value={maxAccessCount} onChange={e => setMaxAccessCount(e.target.value)} className="mt-1 w-full rounded border border-slate-800 bg-[#060a17] p-2 text-white" />
+                </label>
+                <p className="text-xs text-slate-400">Each admitted browser session lasts up to 15 minutes. One-time links admit one session.</p>
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
                   <h4 className="font-bold text-white text-sm flex items-center space-x-2">
                     <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-950/80 border border-blue-800/60 text-blue-400">
@@ -618,7 +633,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
                                 {link.selfDestructed ? 'Self-Destructed (Used)' : 'One-Time Link'}
                               </span>
                             )}
-                            {link.password && (
+                            {(link.hasPassword || link.password) && (
                               <span className="px-2 py-0.5 rounded-md bg-amber-950/80 border border-amber-800/80 text-amber-300 font-medium flex items-center">
                                 <Key className="h-2.5 w-2.5 mr-1" /> Password Protected
                               </span>
@@ -659,6 +674,7 @@ export const AccessControlModal: React.FC<AccessControlModalProps> = ({
           </button>
           {activeTab !== 'links' ? (
             <button
+              disabled={!canManagePolicy}
               onClick={handleSave}
               className="rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-glow-blue transition-all"
             >

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { VantorFile } from '../../lib/types';
 import { ImageViewer } from './ImageViewer';
 import { PdfDocumentViewer } from './PdfDocumentViewer';
@@ -27,6 +27,24 @@ export const FilePreviewViewport: React.FC<FilePreviewViewportProps> = ({ file, 
   const isCode = ['json', 'ts', 'js', 'py', 'xml', 'css', 'html', 'sh', 'yaml', 'yml', 'tsx', 'jsx'].includes(ext);
   const isCsv = ext === 'csv' || mime === 'text/csv';
   const isMarkdown = ext === 'md';
+  const [textContent, setTextContent] = useState<string | null>(null);
+  const [textError, setTextError] = useState('');
+  const textPreview = isCode || isCsv || isMarkdown;
+  useEffect(() => {
+    setTextContent(null); setTextError('');
+    if (!textPreview || file.content || !file.url) return;
+    if (file.size > 2 * 1024 * 1024) { setTextError('Text preview is limited to 2 MB. Download the file to read it.'); return; }
+    const controller = new AbortController();
+    fetch(file.url, { signal: controller.signal, cache: 'no-store' }).then(async response => {
+      if (!response.ok) throw new Error('Unable to load this preview. Reopen the file or share link to retry.');
+      const text = await response.text();
+      if (!controller.signal.aborted) setTextContent(text);
+    }).catch(e => { if (!controller.signal.aborted) setTextError(e.message); });
+    return () => controller.abort();
+  }, [file.id, file.url, file.content, file.size, textPreview]);
+  const content = file.content ?? textContent;
+  if (textPreview && textError) return <p role="alert" className="p-6 text-red-300">{textError}</p>;
+  if (textPreview && content === null && file.url) return <p role="status" className="p-6 text-slate-400">Loading preview…</p>;
 
   if (isImage) {
     const imgSrc = resolveImageSrc(file);
@@ -41,18 +59,18 @@ export const FilePreviewViewport: React.FC<FilePreviewViewportProps> = ({ file, 
     return <MediaViewer file={file} isAudio={isAudio} />;
   }
 
-  if (isCode && file.content) {
-    return <CodeViewer fileName={file.name} content={file.content} />;
+  if (isCode && content !== null && content !== undefined) {
+    return <CodeViewer fileName={file.name} content={content} />;
   }
 
-  if (isCsv && file.content) {
-    return <CsvViewer fileName={file.name} content={file.content} />;
+  if (isCsv && content !== null && content !== undefined) {
+    return <CsvViewer fileName={file.name} content={content} />;
   }
 
-  if (isMarkdown && (file.content || file.description)) {
+  if (isMarkdown && content !== null && content !== undefined) {
     return (
       <div className="w-full bg-slate-950/60 rounded-xl p-6 border border-slate-800 text-slate-200 text-sm leading-relaxed overflow-y-auto max-h-[55vh] shadow-inner font-sans">
-        {file.content || file.description}
+        {content}
       </div>
     );
   }

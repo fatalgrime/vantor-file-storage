@@ -1,347 +1,103 @@
-import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { neon } from '@neondatabase/serverless';
-import {
-  DEFAULT_REPOSITORY_ID,
-  INITIAL_AUDIT_LOGS,
-  INITIAL_FILES,
-  INITIAL_FOLDERS,
-  INITIAL_HERO_CHANGELOG,
-  INITIAL_REPOSITORIES,
-  INITIAL_USERS,
-  INITIAL_ANNOUNCEMENTS,
-  INITIAL_COMMENTS,
-} from '../../../lib/db';
-import { canEditRepository, canManagePlatform } from '../../../lib/authorization';
-import { VantorFile, VantorFolder, VantorRepository, VantorUser, ShareLink, Announcement, FileComment } from '../../../lib/types';
-
-const STATE_ID = 'default';
-
-const defaultState = {
-  files: INITIAL_FILES as VantorFile[],
-  folders: INITIAL_FOLDERS as VantorFolder[],
-  repositories: (INITIAL_REPOSITORIES.length > 0 ? INITIAL_REPOSITORIES : [{
-    id: DEFAULT_REPOSITORY_ID,
-    name: 'Vantor Root Repository',
-    description: 'Default root storage workspace',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-    createdBy: 'System Operator',
-    assignedUserIds: [],
-    assignedRoles: ['admin', 'manager', 'member', 'viewer'],
-  }]) as VantorRepository[],
-  changelog: INITIAL_HERO_CHANGELOG,
-  changelogs: {} as Record<string, any>,
-  auditLogs: INITIAL_AUDIT_LOGS as any[],
-  users: INITIAL_USERS as VantorUser[],
-  announcements: INITIAL_ANNOUNCEMENTS as Announcement[],
-  settings: {
-    theme: 'dark',
-  },
-  shares: [] as ShareLink[],
-  comments: INITIAL_COMMENTS as FileComment[],
-};
-
-type StorageState = typeof defaultState;
-
-const getUserRole = (state: StorageState, userId: string) => {
-  return state.users.find((user) => user.id === userId)?.role || 'admin';
-};
-
-const isSelfRegistrationPatch = (state: StorageState, patch: Partial<StorageState>, userId: string) => {
-  if (!patch.users || patch.files || patch.folders || patch.repositories || patch.changelog || patch.changelogs || patch.auditLogs || patch.announcements) {
-    return false;
-  }
-
-  if (state.users.some((managedUser) => managedUser.id === userId)) return false;
-
-  const previousUserIds = new Set(state.users.map((managedUser) => managedUser.id));
-  const newUser = patch.users.find((managedUser) => managedUser.id === userId);
-
-  return Boolean(newUser && patch.users.some((managedUser) => managedUser.id === userId));
-};
-
-const getRepositoryId = (item: Pick<VantorFile | VantorFolder, 'repositoryId'>) => {
-  return item.repositoryId || DEFAULT_REPOSITORY_ID;
-};
-
-const hasPermissionPolicyChange = (
-  current: VantorFile | VantorFolder | undefined,
-  next: VantorFile | VantorFolder
-) => {
-  if (!current) return false;
-  return current.permissionLevel !== next.permissionLevel ||
-    JSON.stringify(current.allowedRoles || []) !== JSON.stringify(next.allowedRoles || []);
-};
-
-const isDownloadCountOnlyChange = (
-  current: VantorFile | VantorFolder | undefined,
-  next: VantorFile | VantorFolder
-) => {
-  if (!current || !('downloadCount' in current) || !('downloadCount' in next)) return false;
-
-  const { downloadCount: _currentDownloadCount, ...currentWithoutDownloads } = current;
-  const { downloadCount: _nextDownloadCount, ...nextWithoutDownloads } = next;
-
-  return JSON.stringify(currentWithoutDownloads) === JSON.stringify(nextWithoutDownloads) &&
-    next.downloadCount >= current.downloadCount;
-};
-
-const validateContentPatch = (
-  previousItems: Array<VantorFile | VantorFolder>,
-  nextItems: Array<VantorFile | VantorFolder>,
-  repositories: VantorRepository[],
-  role: VantorUser['role'],
-  userId: string
-) => {
-  if (canManagePlatform(role)) return null;
-
-  const previousById = new Map(previousItems.map((item) => [item.id, item]));
-  const nextById = new Map(nextItems.map((item) => [item.id, item]));
-
-  for (const previousItem of previousItems) {
-    if (!nextById.has(previousItem.id)) {
-      return 'Only administrators can delete files or folders.';
-    }
-  }
-
-  for (const nextItem of nextItems) {
-    const previousItem = previousById.get(nextItem.id);
-    if (previousItem && JSON.stringify(previousItem) === JSON.stringify(nextItem)) continue;
-    if (isDownloadCountOnlyChange(previousItem, nextItem)) continue;
-
-    if (hasPermissionPolicyChange(previousItem, nextItem)) {
-      return 'Only administrators can manage item permissions.';
-    }
-
-    const repositoryId = getRepositoryId(nextItem);
-    if (repositoryId === DEFAULT_REPOSITORY_ID || repositoryId === 'repo-default') {
-      if (role === 'viewer') return 'Viewers do not have write access.';
-      continue;
-    }
-
-    const repository = repositories.find((candidate) => candidate.id === repositoryId);
-    if (repository && !canEditRepository(role, userId, repository)) {
-      return 'You do not have editing access to this repository.';
-    }
-  }
-
-  return null;
-};
-
-const validateRepositoryPatch = (
-  previousRepositories: VantorRepository[],
-  nextRepositories: VantorRepository[],
-  role: VantorUser['role'],
-  userId: string
-) => {
-  if (canManagePlatform(role)) return null;
-
-  if (previousRepositories.length !== nextRepositories.length) {
-    if (previousRepositories.length === 0) return null;
-    return 'Only administrators can create or delete repositories.';
-  }
-
-  const previousById = new Map(previousRepositories.map((repository) => [repository.id, repository]));
-  for (const nextRepository of nextRepositories) {
-    const previousRepository = previousById.get(nextRepository.id);
-    if (!previousRepository) continue;
-
-    const isOnlyTimestampBump =
-      previousRepository.id === nextRepository.id &&
-      previousRepository.name === nextRepository.name &&
-      previousRepository.description === nextRepository.description;
-
-    if (isOnlyTimestampBump) continue;
-
-    if (!canEditRepository(role, userId, previousRepository)) {
-      return 'You do not have editing access to this repository.';
-    }
-  }
-
-  return null;
-};
-
-const validatePatch = (state: StorageState, patch: Partial<StorageState>, userId: string) => {
-  if (isSelfRegistrationPatch(state, patch, userId)) return null;
-
-  const role = getUserRole(state, userId);
-  const isAdmin = canManagePlatform(role);
-
-  if (!isAdmin && (patch.users || patch.changelog || patch.changelogs || patch.announcements)) {
-    return 'Only administrators can manage users, permissions, announcements, and platform metadata.';
-  }
-
-  if (!isAdmin && patch.auditLogs) {
-    const previousLogIds = new Set((state.auditLogs || []).map((log) => log.id));
-    const removedAuditLog = (state.auditLogs || []).some((log) => !patch.auditLogs?.some((nextLog) => nextLog.id === log.id));
-    if (removedAuditLog) {
-      return 'Only administrators can delete security logs.';
-    }
-  }
-
-  if (patch.repositories) {
-    const error = validateRepositoryPatch(state.repositories || [], patch.repositories, role, userId);
-    if (error) return error;
-  }
-
-  const repositories = patch.repositories || state.repositories || [];
-
-  if (patch.files) {
-    const error = validateContentPatch(state.files || [], patch.files, repositories, role, userId);
-    if (error) return error;
-  }
-
-  if (patch.folders) {
-    const error = validateContentPatch(state.folders || [], patch.folders, repositories, role, userId);
-    if (error) return error;
-  }
-
-  return null;
-};
-
-const getSql = () => {
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is not configured.');
-  }
-
-  return neon(process.env.DATABASE_URL);
-};
-
-const ensureState = async () => {
-  const sql = getSql();
-
-  await sql`
-    CREATE TABLE IF NOT EXISTS vantor_app_state (
-      id TEXT PRIMARY KEY,
-      data JSONB NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `;
-
-  await sql`
-    INSERT INTO vantor_app_state (id, data)
-    VALUES (${STATE_ID}, ${JSON.stringify(defaultState)}::jsonb)
-    ON CONFLICT (id) DO NOTHING
-  `;
-
-  return sql;
-};
-
-export async function GET() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  try {
-    const sql = await ensureState();
-    const rows = await sql`
-      SELECT data
-      FROM vantor_app_state
-      WHERE id = ${STATE_ID}
-      LIMIT 1
-    `;
-
-    return NextResponse.json(rows[0]?.data ?? defaultState);
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to load storage state.' },
-      { status: 500 }
-    );
-  }
-}
+import { applyMutations, equal, Mutation, StateError } from '../../../lib/mutations';
+import { actor, AppState, safeFile, validateHierarchy, validateMutations, visibleState } from '../../../lib/server/policy';
+import { compareAndSwap, database, ensureSchema, errorResponse, hashPassword, jsonBody, newId, readState, registerUser } from '../../../lib/server/store';
+import { TOTAL_STORAGE_CAPACITY_BYTES } from '../../../lib/db';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
+const headers = { 'Cache-Control': 'private, no-store' };
+export async function GET() {
+  try {
+    const { userId } = await auth();
+    if (!userId) throw new StateError('Unauthorized', 401);
+    await ensureSchema();
+    await registerUser(userId);
+    const { state, revision } = await readState();
+    return Response.json(visibleState(state, userId, revision), { headers });
+  } catch (error) { return errorResponse(error); }
+}
 
 export async function PATCH(request: Request) {
-  const { userId } = await auth();
-
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
-    const sql = await ensureState();
-    const patch = await request.json();
-
-    // Persist file blobs to database & sanitize large base64 contents from JSON state
-    if (Array.isArray(patch.files)) {
-      try {
-        await sql`
-          CREATE TABLE IF NOT EXISTS vantor_file_blobs (
-            file_id TEXT PRIMARY KEY,
-            filename TEXT NOT NULL,
-            mime_type TEXT NOT NULL,
-            data BYTEA NOT NULL,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-          )
-        `;
-
-        for (let i = 0; i < patch.files.length; i++) {
-          const file = patch.files[i] as VantorFile;
-          if (file.content && file.content.startsWith('data:') && !file.url) {
-            try {
-              const parts = file.content.split(',');
-              const mimeMatch = parts[0].match(/data:(.*?);/);
-              const mimeType = mimeMatch ? mimeMatch[1] : file.mimeType || 'application/octet-stream';
-              const base64Data = parts[1] || parts[0];
-              const buffer = Buffer.from(base64Data, 'base64');
-              const hexData = `\\x${buffer.toString('hex')}`;
-
-              await sql`
-                INSERT INTO vantor_file_blobs (file_id, filename, mime_type, data)
-                VALUES (${file.id}, ${file.name}, ${mimeType}, ${hexData}::bytea)
-                ON CONFLICT (file_id) DO UPDATE SET
-                  filename = EXCLUDED.filename,
-                  mime_type = EXCLUDED.mime_type,
-                  data = EXCLUDED.data,
-                  created_at = NOW()
-              `;
-
-              file.url = `/api/public/files/${file.id}`;
-            } catch (blobErr) {
-              console.warn('Failed to auto-save file blob during PATCH:', blobErr);
-            }
-          }
-
-          if (file.content && file.content.length > 200000 && file.content.startsWith('data:')) {
-            delete file.content;
-          }
-        }
-      } catch (tableErr) {
-        console.warn('vantor_file_blobs setup/save error:', tableErr);
+    const { userId } = await auth();
+    if (!userId) throw new StateError('Unauthorized', 401);
+    const body = await jsonBody(request);
+    if (!body || !Array.isArray(body.mutations) || body.mutations.length > 2000 || Object.keys(body).some(k => !['mutations', 'metadata'].includes(k))) throw new StateError('Use record mutations to save changes.');
+    const mutations = body.mutations as Mutation[];
+    if (mutations.some(m => !m || typeof m !== 'object' || m.before === undefined || m.after === undefined)) throw new StateError('Invalid mutation.');
+    const metadata = body.metadata || {};
+    await ensureSchema();
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const { state, revision } = await readState();
+      const user = actor(state, userId);
+      validateMutations(state, userId, mutations, metadata);
+      for (const [key, change] of Object.entries(metadata) as [string, any][]) {
+        const visible = visibleState(state, userId, revision) as any;
+        if (!change || !equal(visible[key], change.before)) throw new StateError('Platform settings changed. Reload and try again.', 409);
       }
+      const translated: Mutation[] = [];
+      const attachedUploadIds: string[] = [];
+      const now = new Date().toISOString();
+      for (const m of mutations) {
+        if (m.collection === 'auditLogs') continue;
+        const old = (state[m.collection] as any[]).find(r => r.id === m.id) || null;
+        let next = m.after ? { ...m.after } : null;
+        if (next && m.collection === 'files') {
+          if (!old || next.uploadId) {
+            const uploadId = old ? next.uploadId : m.id;
+            if (typeof uploadId !== 'string') throw new StateError('Invalid upload reference.');
+            const uploads = await database()`SELECT * FROM vantor_uploads WHERE file_id = ${uploadId} AND owner_id = ${userId}`;
+            const upload = uploads[0];
+            if (!upload || !upload.completed || upload.repository_id !== (next.repositoryId || 'repo-default') || (upload.folder_id || null) !== (next.folderId || null)) throw new StateError('Upload this file to the selected destination before saving it.', 403);
+            if (upload.attached) throw new StateError('This upload is already attached to a file version.', 409);
+            const alreadyAttached = [...state.files, ...(state.trash || []).filter(t => t.collection === 'files').map(t => t.record), ...(state.versions || []).map(v => v.record)].some(f => f.id === uploadId || f.storageId === uploadId);
+            if (alreadyAttached) throw new StateError('This upload is already attached to a file version.', 409);
+            attachedUploadIds.push(uploadId);
+            next = { ...next, uploadId: undefined, storageId: uploadId, size: Number(upload.size), mimeType: upload.mime_type, r2Key: upload.r2_key || undefined, url: safeFile(next as any).url, content: undefined, uploadedBy: old?.uploadedBy || user.name, uploadedByRole: old?.uploadedByRole || user.role, downloadCount: old?.downloadCount || 0, createdAt: old?.createdAt || now, updatedAt: now };
+          } else next = { ...next, content: old.content, url: old.url, r2Key: old.r2Key, storageId: old.storageId, uploadedBy: old.uploadedBy, uploadedByRole: old.uploadedByRole, createdAt: old.createdAt, downloadCount: old.downloadCount, updatedAt: now };
+        }
+        if (next && m.collection === 'comments') next = { ...next, authorId: old?.authorId || userId, authorName: old?.authorName || user.name, authorEmail: old?.authorEmail || user.email, authorRole: old?.authorRole || user.role, createdAt: old?.createdAt || now, updatedAt: now };
+        if (next && m.collection === 'repositories') next.updatedAt = now;
+        if (next && m.collection === 'shares') {
+          if (!old && !/^share-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(m.id)) throw new StateError('Generate a new secure share token.');
+          const { password, passwordHash: ignored, hasPassword, ...rest } = next;
+          next = { ...rest, passwordHash: typeof password === 'string' && password ? hashPassword(password) : old?.passwordHash, viewsCount: old?.viewsCount || 0, downloadsCount: old?.downloadsCount || 0, accessCount: old?.accessCount || 0, selfDestructed: old?.selfDestructed || false, createdBy: old?.createdBy || userId, createdAt: old?.createdAt || now };
+        }
+        translated.push({ ...m, before: old, after: next });
+      }
+      const next = applyMutations(state, translated) as AppState;
+      for (const [key, change] of Object.entries(metadata) as [string, any][]) next[key] = change.after;
+      const removedRepos = new Set(state.repositories.filter(r => !next.repositories.some(n => n.id === r.id)).map(r => r.id));
+      const removedFolders = new Set(state.folders.filter(f => !next.folders.some(n => n.id === f.id)).map(f => f.id));
+      let expanded = true;
+      while (expanded) {
+        expanded = false;
+        for (const folder of next.folders) if (removedRepos.has(folder.repositoryId || 'repo-default') || (folder.parentId && removedFolders.has(folder.parentId))) {
+          if (!removedFolders.has(folder.id)) { removedFolders.add(folder.id); expanded = true; }
+        }
+      }
+      next.folders = next.folders.filter(f => !removedFolders.has(f.id) && !removedRepos.has(f.repositoryId || 'repo-default'));
+      next.files = next.files.filter(f => !removedRepos.has(f.repositoryId || 'repo-default') && !(f.folderId && removedFolders.has(f.folderId)));
+      next.shares = next.shares.filter(s => (s.itemType === 'file' ? next.files : next.folders).some(i => i.id === s.itemId));
+      validateHierarchy(next);
+      const batchId = newId('deletion');
+      const deleted = ['repositories', 'folders', 'files'].flatMap(collection => state[collection].filter((r: any) => !next[collection].some((n: any) => n.id === r.id)).map((record: any) => ({ id: newId('trash'), batchId, collection, record, deletedAt: now, deletedBy: userId })));
+      next.trash = [...(state.trash || []), ...deleted];
+      const totalBytes = next.files.reduce((sum, f) => sum + f.size, 0) + next.trash.filter(t => t.collection === 'files').reduce((sum, t) => sum + t.record.size, 0);
+      if (totalBytes > TOTAL_STORAGE_CAPACITY_BYTES) throw new StateError('Storage capacity exceeded, including recoverable files.', 413);
+      const versions = translated.filter(m => m.collection === 'files' && m.before && m.after).map(m => {
+        const contentChanged = mutations.find(input => input.collection === 'files' && input.id === m.id)?.after?.uploadId;
+        return { id: newId('version'), fileId: m.id, kind: contentChanged ? 'content' : 'metadata', record: { ...m.before, content: contentChanged ? m.before!.content : undefined }, createdAt: now, createdBy: userId };
+      });
+      const allVersions = [...(state.versions || []), ...versions];
+      const counts = new Map<string, number>();
+      next.versions = allVersions.reverse().filter(v => { const count = (counts.get(v.fileId) || 0) + 1; counts.set(v.fileId, count); return count <= 20; }).reverse();
+      const logs = translated.map(m => ({ id: newId('log'), action: !m.after ? 'DELETE' : !m.before ? m.collection === 'files' ? 'UPLOAD' : m.collection === 'folders' ? 'FOLDER_CREATE' : 'METADATA_UPDATE' : 'METADATA_UPDATE', targetName: (m.after || m.before)?.name || m.id, targetType: m.collection === 'folders' ? 'folder' : 'file', performedBy: user.name, role: user.role, timestamp: now, details: `${m.after ? m.before ? 'Updated' : 'Created' : 'Deleted'} ${m.collection} record`, repositoryId: (m.after || m.before)?.repositoryId }));
+      next.auditLogs = [...logs, ...(mutations.some(m => m.collection === 'auditLogs' && !m.after) && user.role === 'admin' ? [] : state.auditLogs)];
+      const committed = await compareAndSwap(revision, next, attachedUploadIds);
+      if (committed !== null) return Response.json(visibleState(next, userId, committed), { headers });
     }
-
-    const currentRows = await sql`
-      SELECT data
-      FROM vantor_app_state
-      WHERE id = ${STATE_ID}
-      LIMIT 1
-    `;
-    const currentState = (currentRows[0]?.data ?? defaultState) as StorageState;
-    const authorizationError = validatePatch(currentState, patch, userId);
-
-    if (authorizationError) {
-      return NextResponse.json({ error: authorizationError }, { status: 403 });
-    }
-
-    const rows = await sql`
-      UPDATE vantor_app_state
-      SET data = data || ${JSON.stringify(patch)}::jsonb,
-          updated_at = NOW()
-      WHERE id = ${STATE_ID}
-      RETURNING data
-    `;
-
-    return NextResponse.json(rows[0]?.data ?? defaultState);
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to update storage state.' },
-      { status: 500 }
-    );
-  }
+    throw new StateError('Storage is busy. Try again.', 409);
+  } catch (error) { return errorResponse(error); }
 }

@@ -57,8 +57,10 @@ interface AdminDashboardProps {
   currentRepositoryId?: string;
   showRepositoryIndex?: boolean;
   currentUserId: string;
-  onUploadFile: (newFile: Partial<VantorFile>) => void;
-  onCreateFolder: (newFolder: Partial<VantorFolder>) => void;
+  onUploadFile: (newFile: Partial<VantorFile> & { blob?: Blob; versionOf?: string }) => Promise<void>;
+  uploadProgress?: number | null;
+  onCancelUpload?: () => void;
+  onCreateFolder: (newFolder: Partial<VantorFolder>) => Promise<void>;
   onUpdateFileMetadata: (fileId: string, updates: Partial<VantorFile>) => void;
   onDeleteFile: (fileId: string) => void;
   onDeleteFolder: (folderId: string) => void;
@@ -85,6 +87,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   showRepositoryIndex = true,
   currentUserId,
   onUploadFile,
+  uploadProgress,
+  onCancelUpload,
   onCreateFolder,
   onUpdateFileMetadata,
   onDeleteFile,
@@ -100,7 +104,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const dialogRef = useDialog(isOpen, onClose);
   const isManager = role === 'manager';
   const [activeTab, setActiveTab] = useState<AdminTab>(activeTabDefault);
-  const [creationStatus, setCreationStatus] = useState<{ type: 'file' | 'folder'; name: string } | null>(null);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [adminLogFilter, setAdminLogFilter] = useState<'ALL' | 'PERMISSION_CHANGE' | 'UPLOAD' | 'DELETE' | 'ANNOUNCEMENT_CREATE'>('ALL');
   const [adminLogRepoFilter, setAdminLogRepoFilter] = useState<string>('ALL');
   const [announcementFilter, setAnnouncementFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
@@ -110,7 +114,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     if (isOpen) {
       setActiveTab(activeTabDefault);
-      setCreationStatus(null);
       if (!showRepositoryIndex && currentRepositoryId) {
         setAdminLogRepoFilter(currentRepositoryId);
       } else {
@@ -132,7 +135,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [fileTags, setFileTags] = useState('');
   const [targetFolderId, setTargetFolderId] = useState<string>('root');
   const [filePermission, setFilePermission] = useState<PermissionLevel>('public');
-  const [rawContent, setRawContent] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState('');
+  const [versionOf, setVersionOf] = useState('');
   const [fileSize, setFileSize] = useState(0);
   const [fileMime, setFileMime] = useState('application/octet-stream');
   const [isProcessingFile, setIsProcessingFile] = useState(false);
@@ -178,10 +183,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   if (!isOpen) return null;
 
-  const handleUploadSubmit = (e: React.FormEvent) => {
+  const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fileName.trim()) return;
-    if (!rawContent) {
+    if (!fileName.trim() || isProcessingFile) return;
+    if (!selectedFile) {
       addToast({ type: 'error', title: 'No file selected', message: 'Please select a file to upload.' });
       return;
     }
@@ -189,7 +194,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const info = detectFileType(fileName.trim(), fileMime);
     const createdName = fileName.trim();
 
-    onUploadFile({
+    setIsProcessingFile(true); setUploadError('');
+    try {
+    await onUploadFile({
       name: createdName,
       originalName: createdName,
       fileType: info.fileType,
@@ -201,7 +208,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       folderId: targetFolderId === 'root' ? null : targetFolderId,
       description: fileDescription || 'Vantor cloud secure asset file.',
       tags: fileTags.split(',').map((t) => t.trim()).filter(Boolean),
-      content: rawContent,
+      blob: selectedFile,
+      versionOf: versionOf || undefined,
       permissionLevel: filePermission,
       allowedRoles: ALL_USER_ROLES,
       allowedUserIds: [],
@@ -209,9 +217,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       uploadedByRole: isManager ? 'manager' : 'admin',
     });
 
+    setVersionOf('');
     setFileName('');
     setFileDescription('');
-    setRawContent('');
+    setSelectedFile(null);
     setFileSize(0);
     setFileMime('application/octet-stream');
     setFileTags('');
@@ -219,13 +228,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       fileInputRef.current.value = '';
     }
 
-    setCreationStatus({ type: 'file', name: createdName });
+    addToast({ type: 'success', title: 'File saved', message: createdName });
+    } catch (e) { setUploadError(e instanceof Error ? e.message : 'Upload failed.'); }
+    finally { setIsProcessingFile(false); }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
-      setRawContent('');
+      setSelectedFile(null);
       setFileSize(0);
       setFileMime('application/octet-stream');
       return;
@@ -245,24 +256,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setFileMime(info.mimeType);
     setFileCategory(info.category);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setRawContent(event.target?.result as string);
-      setIsProcessingFile(false);
-    };
-    reader.onerror = () => {
-      addToast({ type: 'error', title: 'Read error', message: 'Failed to process the selected file.' });
-      setIsProcessingFile(false);
-    };
-    reader.readAsDataURL(file);
+    setSelectedFile(file);
+    setIsProcessingFile(false);
   };
 
-  const handleFolderSubmit = (e: React.FormEvent) => {
+  const handleFolderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!folderName.trim()) return;
+    if (!folderName.trim() || isCreatingFolder) return;
 
     const createdFolderName = folderName.trim();
-    onCreateFolder({
+    setIsCreatingFolder(true);
+    try {
+    await onCreateFolder({
       name: createdFolderName,
       parentId: folderTargetId === 'root' ? null : folderTargetId,
       description: folderDescription || 'New folder directory',
@@ -274,7 +279,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setFolderDescription('');
     setFolderTargetId('root');
 
-    setCreationStatus({ type: 'folder', name: createdFolderName });
+    } catch (e) { addToast({ type: 'error', title: 'Folder was not saved', message: e instanceof Error ? e.message : 'Please retry.' }); }
+    finally { setIsCreatingFolder(false); }
   };
 
   const handleAnnouncementSubmit = (e: React.FormEvent) => {
@@ -294,7 +300,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         isActive: announcementIsActive,
         createdBy: 'System Admin',
       });
-      addToast({ type: 'success', title: 'Announcement Published', message: 'Sitewide announcement has been published.' });
+
     }
 
     setAnnouncementTitle('');
@@ -392,7 +398,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* Tab Navigation */}
         <div className="flex items-center overflow-x-auto border-b border-slate-800 px-6 bg-[#080d1c] text-xs font-medium scrollbar-none w-full flex-shrink-0">
           <button
-            onClick={() => { setCreationStatus(null); setActiveTab('upload'); }}
+            onClick={() => { setActiveTab('upload'); }}
             className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'upload' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
@@ -401,7 +407,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </button>
 
           <button
-            onClick={() => { setCreationStatus(null); setActiveTab('folder'); }}
+            onClick={() => { setActiveTab('folder'); }}
             className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'folder' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
@@ -410,7 +416,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </button>
 
           <button
-            onClick={() => { setCreationStatus(null); setActiveTab('announcements'); }}
+            onClick={() => { setActiveTab('announcements'); }}
             className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'announcements' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
           >
@@ -426,7 +432,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {!isManager && (
             <button
-              onClick={() => { setCreationStatus(null); setActiveTab('files'); }}
+              onClick={() => { setActiveTab('files'); }}
               className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'files' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
                 }`}
             >
@@ -437,7 +443,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {!isManager && (
             <button
-              onClick={() => { setCreationStatus(null); setActiveTab('users'); }}
+              onClick={() => { setActiveTab('users'); }}
               className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'users' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
                 }`}
             >
@@ -448,7 +454,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {!isManager && (
             <button
-              onClick={() => { setCreationStatus(null); setActiveTab('logs'); }}
+              onClick={() => { setActiveTab('logs'); }}
               className={`py-3 px-4 border-b-2 font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${activeTab === 'logs' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'
                 }`}
             >
@@ -460,39 +466,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {/* Tab Content Body */}
         <div className="p-6 overflow-y-auto flex-1">
-          {creationStatus ? (
-            <div className="flex flex-col items-center justify-center py-16 px-6 text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
-              <div className="relative flex items-center justify-center">
-                <div className="absolute -inset-3 rounded-full bg-emerald-500/20 animate-ping opacity-75" style={{ animationDuration: '2.5s' }} />
-                <div className="h-20 w-20 rounded-full bg-emerald-950/80 border-2 border-emerald-500 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-900/30 relative">
-                  <CheckCircle className="h-10 w-10 text-emerald-400" />
-                </div>
-              </div>
-
-              <div className="space-y-2 max-w-md">
-                <h3 className="text-xl font-bold text-white tracking-tight">
-                  {creationStatus.type === 'file' ? 'Creating file…' : 'Creating folder…'}
-                </h3>
-                <p className="text-xs text-slate-300 leading-relaxed font-sans">
-                  A notification will appear in the bottom-right corner of your screen when your file or folder has finished uploading.
-                </p>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  onClick={() => setCreationStatus(null)}
-                  className="px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white shadow-lg shadow-blue-600/30 transition-all flex items-center space-x-2"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  <span>{isManager ? 'Go to Manager Dashboard' : 'Go to Admin Dashboard'}</span>
-                </button>
-              </div>
-            </div>
-          ) : (
             <>
               {/* 1. UPLOAD FILE TAB */}
               {activeTab === 'upload' && (
+                <>
+                <div role="status" aria-live="polite">
+                  {isProcessingFile && <div className="my-3"><progress aria-label="Upload progress" max={100} value={uploadProgress ?? 100} className="w-full" /><span>{uploadProgress === null ? 'Saving metadata…' : String(uploadProgress ?? 0) + '% uploaded'}</span>{uploadProgress !== null && <button type="button" onClick={onCancelUpload} className="storage-button ml-3">Cancel upload</button>}</div>}
+                  {uploadError && <p role="alert" className="text-red-300 my-3">{uploadError} Your selected file is ready to retry.</p>}
+                </div>
                 <form onSubmit={handleUploadSubmit} className="space-y-4 text-xs font-sans">
+                  <label className="block text-slate-300">Upload destination
+                    <select value={versionOf} disabled={isProcessingFile} onChange={e => setVersionOf(e.target.value)} className="mt-1 w-full rounded border border-slate-800 bg-slate-950 p-2 text-white">
+                      <option value="">Create a new file</option>
+                      {files.map(file => <option key={file.id} value={file.id}>New content version of {file.name}</option>)}
+                    </select>
+                  </label>
+                  {versionOf && <p className="text-slate-400">The selected file keeps its ID, location, metadata, permissions, comments, and shared links. Administrators can restore its previous content in file history.</p>}
+                  <fieldset disabled={Boolean(versionOf) || isProcessingFile} className="space-y-4 disabled:opacity-50">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-slate-300 font-semibold mb-1">File Name *</label>
@@ -538,7 +528,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         value={filePermission}
                         onChange={(val: string) => setFilePermission(val as PermissionLevel)}
                         options={[
-                          { value: 'public', label: 'Public (Anyone with link)', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
+                          { value: 'public', label: 'Repository readers', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
                           { value: 'authenticated', label: 'Authenticated Users', icon: <UserCheck className="h-3.5 w-3.5 text-blue-400" /> },
                           { value: 'role_restricted', label: 'Role Restricted (Specific Roles)', icon: <Shield className="h-3.5 w-3.5 text-amber-400" /> },
                           { value: 'private', label: 'Admin Only', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
@@ -569,12 +559,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     />
                   </div>
 
+                  </fieldset>
                   <div>
                     <label className="block text-slate-300 font-semibold mb-1">Select File (Max 50MB)</label>
                     <div className="relative w-full bg-[#040813] border border-slate-800 rounded-lg p-2 flex items-center justify-center">
                       <input
                         ref={fileInputRef}
                         type="file"
+                        disabled={isProcessingFile}
                         onChange={handleFileSelect}
                         className="w-full text-xs text-slate-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-900/40 file:text-blue-300 hover:file:bg-blue-800/60 transition-colors"
                       />
@@ -585,13 +577,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="pt-2">
                     <button
                       type="submit"
+                      disabled={isProcessingFile}
                       className="w-full rounded-lg bg-blue-600 hover:bg-blue-500 py-2.5 text-xs font-bold text-white shadow-glow-blue transition-all flex items-center justify-center space-x-2"
                     >
                       <Upload className="h-4 w-4" />
-                      <span>Upload File to Vantor Vault</span>
+                      <span>{isProcessingFile ? uploadProgress === null ? 'Saving file…' : 'Uploading…' : uploadError ? 'Retry upload' : 'Upload File to Vantor Vault'}</span>
                     </button>
                   </div>
                 </form>
+                </>
               )}
 
               {/* 2. CREATE FOLDER TAB */}
@@ -635,7 +629,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       value={folderPermission}
                       onChange={(val: string) => setFolderPermission(val as PermissionLevel)}
                       options={[
-                        { value: 'public', label: 'Public (Anyone with link)', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
+                        { value: 'public', label: 'Repository readers', icon: <Globe className="h-3.5 w-3.5 text-emerald-400" /> },
                         { value: 'authenticated', label: 'Authenticated Users', icon: <UserCheck className="h-3.5 w-3.5 text-blue-400" /> },
                         { value: 'role_restricted', label: 'Role Restricted', icon: <Shield className="h-3.5 w-3.5 text-amber-400" /> },
                         { value: 'private', label: 'Admin Only', icon: <Lock className="h-3.5 w-3.5 text-rose-400" /> },
@@ -646,10 +640,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="pt-3">
                     <button
                       type="submit"
+                      disabled={isCreatingFolder}
                       className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-lg transition-all flex items-center justify-center space-x-2"
                     >
                       <FolderPlus className="h-4 w-4" />
-                      <span>Create Directory Folder</span>
+                      <span>{isCreatingFolder ? 'Saving folder…' : 'Create Directory Folder'}</span>
                     </button>
                   </div>
                 </form>
@@ -1172,7 +1167,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               )}
             </>
-          )}
         </div>
       </div>
     </div>

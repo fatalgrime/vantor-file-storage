@@ -121,6 +121,7 @@ export interface ShareLink {
   permission: 'view' | 'edit'; // 'view' is view-only, 'edit' allows downloads
   allowDownload: boolean; // Fine-grained permission: can they download?
   password?: string;     // Password protection (optional)
+  hasPassword?: boolean;
   expiresAt?: string;    // Expiration timestamp (optional)
   maxAccessCount?: number; // Maximum visits (optional)
   oneTimeOnly?: boolean; // Self-destruct after single view or download

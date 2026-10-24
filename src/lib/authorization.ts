@@ -80,7 +80,7 @@ export const canReadItem = (
     case 'private':
       return item.allowedUserIds?.includes(userId) ?? false;
     default:
-      return true;
+      return false;
   }
 };
 

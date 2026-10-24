@@ -34,7 +34,7 @@ const MarkdownText: React.FC<{ text: string; users: VantorUser[] }> = ({ text, u
       const tokens: React.ReactNode[] = [];
       let lastIndex = 0;
 
-      const regex = /(@[A-Za-z0-9_\s\.\-]+?)(?=[,\s\?\!]|$)|\*\*([^\*]+)\*\*|`([^`]+)`|\*([^\*]+)\*/g;
+      const regex = /(@[A-Za-z0-9_\s.-]+?)(?=[,\s?!]|$)|\*\*([^*]+)\*\*|`([^`]+)`|\*([^*]+)\*/g;
       let match: RegExpExecArray | null;
 
       while ((match = regex.exec(line)) !== null) {

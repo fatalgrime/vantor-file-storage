@@ -1,10 +1,13 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { SignInButton, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
+import { useStorageState } from '../hooks/useStorageState';
+import { uploadFile } from '../lib/upload';
+import { RecoveryPanel } from './RecoveryPanel';
 import { Navbar } from './Navbar';
-import { formatBytes, formatRelativeTime, getRepositoryLastUpdated, matchesModifiedFilter, sanitizeLegacyStateTimestamps } from '../lib/dateUtils';
+import { formatBytes, formatRelativeTime, getRepositoryLastUpdated, matchesModifiedFilter } from '../lib/dateUtils';
 import { detectFileType } from '../lib/utils';
 import { matchesSearch } from '../lib/search';
 import { getSearchResults, SearchResult } from '../lib/searchResults';
@@ -31,17 +34,7 @@ import {
   hasRepositoryAccess,
   canEditItem,
 } from '../lib/authorization';
-import {
-  DEFAULT_REPOSITORY_ID,
-  INITIAL_FILES,
-  INITIAL_FOLDERS,
-  INITIAL_HERO_CHANGELOG,
-  INITIAL_AUDIT_LOGS,
-  INITIAL_REPOSITORIES,
-  INITIAL_USERS,
-  INITIAL_ANNOUNCEMENTS,
-  INITIAL_COMMENTS,
-} from '../lib/db';
+import { DEFAULT_REPOSITORY_ID } from '../lib/db';
 import { VantorFile, VantorFolder, AuditLog, HeroChangelogData, UserRole, PermissionLevel, VantorRepository, VantorUser, Collaborator, ShareLink, Announcement, FileComment } from '../lib/types';
 
 interface PersistedState {
@@ -143,19 +136,20 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
 
   const displayName = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Vantor User';
 
-  const persistState = async (patch: Partial<PersistedState>) => {
-    const response = await fetch('/api/storage-state', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    });
-
-    if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      const errorMessage = payload?.error || `HTTP ${response.status}: Failed to persist changes.`;
-      throw new Error(errorMessage);
-    }
+  const [recovery, setRecovery] = useState<{ trash: any[]; versions: any[] }>({ trash: [], versions: [] });
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const uploadController = useRef<AbortController | null>(null);
+  const completedUploads = useRef(new WeakMap<Blob, { fileId: string; url: string; size: number; repositoryId: string; folderId: string | null }>());
+  const applyServerState = (data: any) => {
+    setFiles(data.files); setFolders(data.folders); setRepositories(data.repositories);
+    setManagedUsers(data.users); setShares(data.shares); setComments(data.comments);
+    setAuditLogs(data.auditLogs); setAnnouncements(data.announcements);
+    setChangelog(data.changelog); setChangelogs(data.changelogs);
+    const preference = localStorage.getItem('vantor-theme-' + user?.id);
+    setTheme(preference === 'light' || preference === 'dark' ? preference : data.settings?.theme || 'dark');
+    setRecovery({ trash: data.trash || [], versions: data.versions || [] });
   };
+  const { persistState, initialize, reload, saveStatus, saveError } = useStorageState(applyServerState);
 
   useEffect(() => {
     setIsMounted(true);
@@ -173,165 +167,14 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
         }
 
         const data = await response.json() as PersistedState;
-        const rawFiles = data.files || [];
-        const rawFolders = data.folders || [];
-        const rawRepositories = data.repositories || [];
-        const rawAuditLogs = data.auditLogs || [];
-
-        const {
-          files: currentFiles,
-          folders: currentFolders,
-          repositories: currentRepositories,
-          hasChanges: legacySanitized,
-        } = sanitizeLegacyStateTimestamps({
-          files: rawFiles,
-          folders: rawFolders,
-          repositories: rawRepositories,
-          auditLogs: rawAuditLogs,
-        });
-
-        if (legacySanitized) {
-          persistState({
-            files: currentFiles,
-            folders: currentFolders,
-            repositories: currentRepositories,
-          }).catch((error) => console.error('Failed to persist sanitized timestamps:', error));
-        }
-
-        setFiles(currentFiles);
-        setFolders(currentFolders);
-        setRepositories(currentRepositories);
+        initialize(data);
+        applyServerState(data);
+        const currentRepositories = data.repositories || [];
         const availableRepositories = currentRepositories;
         const requestedRepositoryExists = initialRepositoryId && availableRepositories.some((repository) => repository.id === initialRepositoryId);
         setCurrentRepositoryId(requestedRepositoryExists ? initialRepositoryId : availableRepositories[0]?.id || '');
-        setChangelog(data.changelog || { title: '', subtitle: '', releases: [] });
-        setChangelogs(data.changelogs || {});
-        setAuditLogs(rawAuditLogs);
-        setAnnouncements(data.announcements || INITIAL_ANNOUNCEMENTS || []);
-        setShares(data.shares || []);
-        setComments(data.comments || INITIAL_COMMENTS || []);
-
-        const loadedUsers = data.users || [];
-        let activeUsers = [...loadedUsers];
-        const currentEmail = user?.primaryEmailAddress?.emailAddress;
-
-        if (user?.id) {
-          // 1. General sweep to merge any duplicates by email first
-          const emailGroups: Record<string, VantorUser[]> = {};
-          activeUsers.forEach(u => {
-            if (u.email) {
-              const emailKey = u.email.toLowerCase();
-              if (!emailGroups[emailKey]) emailGroups[emailKey] = [];
-              emailGroups[emailKey].push(u);
-            }
-          });
-
-          const resolvedUsers: VantorUser[] = [];
-          let stateChanged = false;
-
-          for (const emailKey of Object.keys(emailGroups)) {
-            const group = emailGroups[emailKey];
-            if (group.length === 1) {
-              resolvedUsers.push(group[0]);
-            } else {
-              stateChanged = true;
-              // Consolidate the group
-              const matchingSelf = group.find(u => u.id === user.id);
-              if (matchingSelf) {
-                // Merge others into matchingSelf
-                let bestRole = matchingSelf.role;
-                group.forEach(u => {
-                  if (u.id !== user.id) {
-                    if (u.role === 'admin') bestRole = 'admin';
-                    else if (u.role === 'manager' && bestRole !== 'admin') bestRole = 'manager';
-                    else if (u.role === 'member' && bestRole !== 'admin' && bestRole !== 'manager') bestRole = 'member';
-                  }
-                });
-                resolvedUsers.push({
-                  ...matchingSelf,
-                  role: bestRole,
-                  lastActive: new Date().toISOString(),
-                  avatarUrl: user.imageUrl || matchingSelf.avatarUrl,
-                  name: displayName || matchingSelf.name
-                });
-              } else {
-                // None match current user.id. Select the best one to keep
-                let bestUser = group[0];
-                group.forEach(u => {
-                  const roleRank = (r: string) => r === 'admin' ? 4 : r === 'manager' ? 3 : r === 'member' ? 2 : 1;
-                  if (roleRank(u.role) > roleRank(bestUser.role)) {
-                    bestUser = u;
-                  } else if (roleRank(u.role) === roleRank(bestUser.role)) {
-                    const dateU = new Date(u.lastActive).getTime();
-                    const dateBest = new Date(bestUser.lastActive).getTime();
-                    if (!isNaN(dateU) && (isNaN(dateBest) || dateU > dateBest)) {
-                      bestUser = u;
-                    }
-                  }
-                });
-                resolvedUsers.push(bestUser);
-              }
-            }
-          }
-
-          // 2. Check if current user exists in resolved users list
-          const hasSelf = resolvedUsers.some(u => u.id === user.id);
-          const selfByEmailIndex = currentEmail ? resolvedUsers.findIndex(u => u.email.toLowerCase() === currentEmail.toLowerCase()) : -1;
-
-          if (hasSelf) {
-            const originalSelf = resolvedUsers.find(u => u.id === user.id);
-            const oneHourAgo = Date.now() - 60 * 60 * 1000;
-            const needsActiveUpdate = originalSelf && (!originalSelf.lastActive || originalSelf.lastActive === 'today' || new Date(originalSelf.lastActive).getTime() < oneHourAgo);
-
-            if (stateChanged || needsActiveUpdate || (originalSelf && (originalSelf.avatarUrl !== user.imageUrl || originalSelf.name !== displayName))) {
-              activeUsers = resolvedUsers.map(u =>
-                u.id === user.id
-                  ? {
-                    ...u,
-                    lastActive: new Date().toISOString(),
-                    avatarUrl: user.imageUrl || u.avatarUrl,
-                    name: displayName || u.name
-                  }
-                  : u
-              );
-              await persistState({ users: activeUsers });
-            } else {
-              activeUsers = resolvedUsers;
-            }
-          } else if (selfByEmailIndex !== -1) {
-            // The current user has a matching email in the DB but under a different ID.
-            // Update that record to use current ID, name, avatar, and active timestamp, preserving its role.
-            activeUsers = resolvedUsers.map((u, idx) =>
-              idx === selfByEmailIndex
-                ? {
-                  ...u,
-                  id: user.id,
-                  name: displayName,
-                  avatarUrl: user.imageUrl || u.avatarUrl,
-                  lastActive: new Date().toISOString()
-                }
-                : u
-            );
-            await persistState({ users: activeUsers });
-          } else {
-            // Brand new user registration
-            const newUser: VantorUser = {
-              id: user.id,
-              name: displayName,
-              email: currentEmail || 'no-email@clerk.user',
-              avatarUrl: user.imageUrl,
-              role: 'viewer',
-              locked: false,
-              lastActive: new Date().toISOString(),
-            };
-            activeUsers = [...resolvedUsers, newUser];
-            await persistState({ users: activeUsers });
-          }
-        } else {
-          activeUsers = loadedUsers;
-        }
-        setManagedUsers(activeUsers);
-        setTheme(data.settings?.theme || 'dark');
+        const self = data.users.find(u => u.id === user?.id);
+        setCurrentRole(self?.role || 'viewer');
         setLoadError('');
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : 'Failed to load database state.');
@@ -343,8 +186,8 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     loadState();
   }, [isSignedIn, user?.id, initialRepositoryId]);
 
-  // Active User Role state (Defaults to 'admin' for easy previewing, toggleable in Navbar)
-  const [currentRole, setCurrentRole] = useState<UserRole>('admin');
+  // Administrators can preview the interface as a lower role.
+  const [currentRole, setCurrentRole] = useState<UserRole>('viewer');
 
   // Navigation & Directory state
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
@@ -381,7 +224,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
 
     const nextAnnouncements = [created, ...announcements];
     const log: AuditLog = {
-      id: `log-${Date.now()}`,
+      id: 'log-' + crypto.randomUUID(),
       action: 'ANNOUNCEMENT_CREATE',
       targetName: created.title,
       targetType: 'announcement',
@@ -394,7 +237,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     const nextLogs = [log, ...auditLogs];
     setAnnouncements(nextAnnouncements);
     setAuditLogs(nextLogs);
-    persistState({ announcements: nextAnnouncements, auditLogs: nextLogs }).catch((error) => setLoadError(error.message));
+    persistState({ announcements: nextAnnouncements, auditLogs: nextLogs }).catch(() => {});
   };
 
   const handleUpdateAnnouncement = (id: string, updates: Partial<Announcement>) => {
@@ -403,7 +246,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     const target = announcements.find((a) => a.id === id);
 
     const log: AuditLog = {
-      id: `log-${Date.now()}`,
+      id: 'log-' + crypto.randomUUID(),
       action: 'ANNOUNCEMENT_UPDATE',
       targetName: target?.title || id,
       targetType: 'announcement',
@@ -416,7 +259,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     const nextLogs = [log, ...auditLogs];
     setAnnouncements(nextAnnouncements);
     setAuditLogs(nextLogs);
-    persistState({ announcements: nextAnnouncements, auditLogs: nextLogs }).catch((error) => setLoadError(error.message));
+    persistState({ announcements: nextAnnouncements, auditLogs: nextLogs }).catch(() => {});
   };
 
   const handleDeleteAnnouncement = (id: string) => {
@@ -425,7 +268,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     const nextAnnouncements = announcements.filter((a) => a.id !== id);
 
     const log: AuditLog = {
-      id: `log-${Date.now()}`,
+      id: 'log-' + crypto.randomUUID(),
       action: 'ANNOUNCEMENT_DELETE',
       targetName: target?.title || id,
       targetType: 'announcement',
@@ -438,7 +281,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     const nextLogs = [log, ...auditLogs];
     setAnnouncements(nextAnnouncements);
     setAuditLogs(nextLogs);
-    persistState({ announcements: nextAnnouncements, auditLogs: nextLogs }).catch((error) => setLoadError(error.message));
+    persistState({ announcements: nextAnnouncements, auditLogs: nextLogs }).catch(() => {});
   };
 
   // Access Control Permission Modal state
@@ -452,7 +295,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
 
   const handleSetTheme = (nextTheme: 'dark' | 'light') => {
     setTheme(nextTheme);
-    persistState({ settings: { theme: nextTheme } }).catch((error) => setLoadError(error.message));
+    localStorage.setItem('vantor-theme-' + user?.id, nextTheme);
   };
 
   const currentRepository = useMemo(() => {
@@ -498,7 +341,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     return greetings[dayOfYear % greetings.length];
   }, [user?.firstName, user?.fullName, currentManagedUser?.name]);
 
-  const actualRole = currentManagedUser?.role || currentRole;
+  const actualRole = currentManagedUser?.role || 'viewer';
   const canUseRoleSwitcher = actualRole === 'admin';
   const effectiveRole = canUseRoleSwitcher ? currentRole : actualRole;
   const currentUserId = user?.id || '';
@@ -721,27 +564,8 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
 
   // Download logic
   const handleDownloadFile = (file: VantorFile) => {
-    const nextFiles = files.map((f) => f.id === file.id ? { ...f, downloadCount: f.downloadCount + 1 } : f);
-    // Increment download count
-    setFiles(nextFiles);
-
-    let url = '';
-    let isTempBlob = false;
-
-    if (file.content?.startsWith('data:')) {
-      url = file.content;
-    } else if (file.url) {
-      url = file.url;
-    } else if (file.content) {
-      const blob = new Blob([file.content], { type: file.mimeType });
-      url = URL.createObjectURL(blob);
-      isTempBlob = true;
-    } else {
-      const blob = new Blob([file.description || ''], { type: file.mimeType || 'text/plain' });
-      url = URL.createObjectURL(blob);
-      isTempBlob = true;
-    }
-
+    const url = '/api/public/files/' + encodeURIComponent(file.id) + '?download=1';
+    const isTempBlob = false;
     const a = document.createElement('a');
     a.href = url;
     a.download = file.name;
@@ -754,8 +578,6 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     }
 
     // Add Audit Log
-    addAuditLog('DOWNLOAD', file.name, 'file', `Downloaded file (${file.formattedSize})`, file.repositoryId);
-    persistState({ files: nextFiles }).catch((error) => setLoadError(error.message));
     addToast({ type: 'success', title: 'Download started', message: `"${file.name}" (${file.formattedSize})` });
   };
 
@@ -801,18 +623,18 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     setAuditLogs(nextLogs);
     setRepositories(nextRepositories);
     setSelectedIds([]);
-    persistState({ folders: nextFolders, files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories }).catch((error) => setLoadError(error.message));
-    addToast({ type: 'success', title: 'Items deleted', message: `${deletedFolders.length + deletedFiles.length} item(s) removed successfully.` });
+    persistState({ folders: nextFolders, files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories }).catch(() => {});
+
   };
 
   const handleCopyLink = async (item: VantorFile | VantorFolder) => {
-    const existing = shares.find(s => s.itemId === item.id && (!s.expiresAt || new Date(s.expiresAt).getTime() > Date.now()));
-    let linkId = '';
+    const existing = shares.find(s => s.itemId === item.id && !s.hasPassword && !s.password && !s.oneTimeOnly && !s.maxAccessCount && (!s.expiresAt || new Date(s.expiresAt).getTime() > Date.now()));
+    let linkId: string;
 
     if (existing) {
       linkId = existing.id;
     } else {
-      linkId = 'share-' + Math.random().toString(36).substring(2, 11) + Math.random().toString(36).substring(2, 11);
+      linkId = 'share-' + crypto.randomUUID();
       const newLink: ShareLink = {
         id: linkId,
         itemId: item.id,
@@ -832,7 +654,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       setAuditLogs(nextLogs);
       const nextShares = [...shares, newLink];
       setShares(nextShares);
-      await persistState({ shares: nextShares, auditLogs: nextLogs }).catch((error) => console.error(error));
+      try { await persistState({ shares: nextShares, auditLogs: nextLogs }); } catch (e) { addToast({ type: 'error', title: 'Share was not saved', message: e instanceof Error ? e.message : 'Try again.' }); return; }
     }
 
     const url = `${window.location.origin}/share/${linkId}`;
@@ -845,66 +667,49 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
   };
 
   // CRUD Operations
-  const handleUploadFile = async (newFileData: Partial<VantorFile>) => {
-    const destFolderId = newFileData.folderId !== undefined ? newFileData.folderId : currentFolderId;
-    const destFolder = destFolderId ? folders.find((f) => f.id === destFolderId) : undefined;
-    const hasWriteAccess = destFolder
-      ? canEditItem(effectiveRole, currentUserId, destFolder, folders, currentRepository)
-      : (currentRepository ? canEditCurrentRepository : true);
-
-    if (!hasWriteAccess) {
-      addToast({ type: 'error', title: 'Access denied', message: 'You do not have editor permissions in this location.' });
-      return;
-    }
-
-    const targetRepoId = currentRepositoryId || DEFAULT_REPOSITORY_ID;
-    let finalContent = newFileData.content;
-    let r2Url = '';
-
-    if (newFileData.content && newFileData.content.startsWith('data:')) {
+  const handleUploadFile = async (newFileData: Partial<VantorFile> & { blob?: Blob; versionOf?: string }) => {
+    const replacement = newFileData.versionOf ? files.find(f => f.id === newFileData.versionOf) : undefined;
+    if (newFileData.versionOf && !replacement) throw new Error('The selected file is no longer available.');
+    const destFolderId = replacement ? replacement.folderId : newFileData.folderId !== undefined ? newFileData.folderId : currentFolderId;
+    const destFolder = destFolderId ? folders.find(f => f.id === destFolderId) : undefined;
+    const targetRepoId = replacement?.repositoryId || destFolder?.repositoryId || currentRepositoryId || DEFAULT_REPOSITORY_ID;
+    const destinationRepository = repositories.find(r => r.id === targetRepoId);
+    const hasWriteAccess = replacement
+      ? canEditItem(effectiveRole, currentUserId, replacement, folders, destinationRepository)
+      : destFolder ? canEditItem(effectiveRole, currentUserId, destFolder, folders, destinationRepository)
+      : Boolean(destinationRepository && userCanEditRepository(effectiveRole, currentUserId, destinationRepository));
+    if (!hasWriteAccess) throw new Error('You do not have upload permission in this location.');
+    if (!newFileData.blob) throw new Error('Select a file to upload.');
+    let uploaded = completedUploads.current.get(newFileData.blob);
+    if (!uploaded || uploaded.repositoryId !== targetRepoId || uploaded.folderId !== (destFolderId || null)) {
+      const controller = new AbortController(); uploadController.current = controller;
+      setUploadProgress(0);
       try {
-        const fetchRes = await fetch(newFileData.content);
-        const blob = await fetchRes.blob();
-        const formData = new FormData();
-        const fileId = `file-${Date.now()}`;
-        formData.append('file', blob, newFileData.name || 'file');
-        formData.append('fileId', fileId);
-
-        const r2Res = await fetch('/api/r2/upload', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (r2Res.ok) {
-          const r2Data = await r2Res.json();
-          if (r2Data.url) {
-            r2Url = r2Data.url;
-          }
-        }
-      } catch (err) {
-        console.warn('R2 upload fallback to inline state:', err);
-      }
+        const result = await uploadFile(newFileData.blob, newFileData.name || 'file', targetRepoId, destFolderId || null, controller.signal, setUploadProgress);
+        uploaded = { ...result, repositoryId: targetRepoId, folderId: destFolderId || null };
+        completedUploads.current.set(newFileData.blob, uploaded);
+      } finally { setUploadProgress(null); uploadController.current = null; }
     }
 
     const fileInfo = detectFileType(newFileData.name || 'Untitled File', newFileData.mimeType);
 
     const newFile: VantorFile = {
-      id: `file-${Date.now()}`,
+      id: uploaded.fileId,
       name: newFileData.name || 'Untitled File',
       originalName: newFileData.originalName || newFileData.name || 'Untitled File',
       fileType: fileInfo.fileType,
       category: newFileData.category || fileInfo.category,
       extension: fileInfo.extension,
       mimeType: fileInfo.mimeType,
-      size: newFileData.size || 1024,
+      size: uploaded.size,
       formattedSize: newFileData.formattedSize || formatBytes(newFileData.size || 1024),
       folderId: destFolderId,
       description: newFileData.description || 'Uploaded asset',
       tags: newFileData.tags || ['upload'],
-      content: finalContent,
-      url: r2Url || undefined,
+      content: undefined,
+      url: uploaded.url,
       repositoryId: targetRepoId,
-      permissionLevel: newFileData.permissionLevel || 'public',
+      permissionLevel: newFileData.permissionLevel || 'authenticated',
       allowedRoles: newFileData.allowedRoles || ALL_USER_ROLES,
       allowedUserIds: [],
       uploadedBy: displayName,
@@ -914,7 +719,11 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       updatedAt: new Date().toISOString(),
     };
 
-    const nextFiles = [newFile, ...files];
+    const nextFiles = replacement ? files.map(f => f.id === replacement.id ? {
+      ...f, uploadId: uploaded.fileId, size: uploaded.size, formattedSize: formatBytes(uploaded.size),
+      mimeType: fileInfo.mimeType, extension: fileInfo.extension, fileType: fileInfo.fileType,
+      originalName: newFileData.originalName || newFileData.name || f.originalName, updatedAt: new Date().toISOString(),
+    } : f) : [newFile, ...files];
     const nextLogs = [createAuditLog('UPLOAD', newFile.name, 'file', `Uploaded file (${newFile.formattedSize})`), ...auditLogs];
     const nextRepositories = touchRepository(targetRepoId);
 
@@ -923,24 +732,14 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     setAuditLogs(nextLogs);
     setRepositories(nextRepositories);
 
-    // Strip large inline content before persisting to avoid bloating the DB and HTTP payload
-    const persistableFiles = nextFiles.map(f => {
-      if (f.content && f.content.length > 200000 && f.content.startsWith('data:')) {
-        const { content: _stripped, ...rest } = f;
-        return rest as VantorFile;
-      }
-      return f;
-    });
-
     try {
-      await persistState({ files: persistableFiles, auditLogs: nextLogs, repositories: nextRepositories });
-      addToast({ type: 'success', title: 'File uploaded', message: `"${newFile.name}" added to repository.` });
+      await persistState({ files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories });
+      completedUploads.current.delete(newFileData.blob);
+      addToast({ type: 'success', title: replacement ? 'File version saved' : 'File uploaded', message: replacement ? `New content saved for "${replacement.name}".` : `"${newFile.name}" added to repository.` });
     } catch (error) {
-      setFiles(files);
-      setAuditLogs(auditLogs);
       const msg = error instanceof Error ? error.message : 'Failed to save file to database.';
       addToast({ type: 'error', title: 'Upload Failed', message: msg });
-      setLoadError(msg);
+      throw error;
     }
   };
 
@@ -953,7 +752,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
 
     if (!hasWriteAccess) {
       addToast({ type: 'error', title: 'Access denied', message: 'You do not have editor permissions in this location.' });
-      return;
+      throw new Error('You do not have permission to create a folder here.');
     }
 
     const targetRepoId = currentRepositoryId || DEFAULT_REPOSITORY_ID;
@@ -986,11 +785,9 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       await persistState({ folders: nextFolders, auditLogs: nextLogs, repositories: nextRepositories });
       addToast({ type: 'success', title: 'Folder created', message: `"${newFolder.name}" directory created.` });
     } catch (error) {
-      setFolders(folders);
-      setAuditLogs(auditLogs);
       const msg = error instanceof Error ? error.message : 'Failed to save folder to database.';
       addToast({ type: 'error', title: 'Creation Failed', message: msg });
-      setLoadError(msg);
+      throw error;
     }
   };
 
@@ -1021,7 +818,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
 
     if (currentChangelogKey === 'project') {
       setChangelog(nextChangelog);
-      persistState({ changelog: nextChangelog }).catch((error) => setLoadError(error.message));
+      persistState({ changelog: nextChangelog }).catch(() => {});
       return;
     }
 
@@ -1030,7 +827,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       [currentChangelogKey]: nextChangelog,
     };
     setChangelogs(nextChangelogs);
-    persistState({ changelogs: nextChangelogs }).catch((error) => setLoadError(error.message));
+    persistState({ changelogs: nextChangelogs }).catch(() => {});
   };
 
   const handleCreateRepository = () => {
@@ -1066,8 +863,8 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     setSelectedIds([]);
     setSearchQuery('');
     setDialog(null);
-    persistState({ repositories: nextRepositories }).catch((error) => setLoadError(error.message));
-    addToast({ type: 'success', title: 'Repository created', message: `"${name}" workspace is ready.` });
+    persistState({ repositories: nextRepositories }).catch(() => {});
+
   };
 
   const handleRenameRepository = (repository: VantorRepository) => {
@@ -1096,7 +893,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     setRepositories(nextRepositories);
     setAuditLogs(nextLogs);
     setDialog(null);
-    persistState({ repositories: nextRepositories, auditLogs: nextLogs }).catch((error) => setLoadError(error.message));
+    persistState({ repositories: nextRepositories, auditLogs: nextLogs }).catch(() => {});
   };
 
   const handleRequestDeleteRepository = (repository: VantorRepository) => {
@@ -1143,12 +940,8 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       files: nextFiles,
       folders: nextFolders,
       auditLogs: nextLogs,
-    }).catch((error) => setLoadError(error.message));
-    addToast({
-      type: 'success',
-      title: 'Repository deleted',
-      message: `"${deletedRepoName}" repository and its contents were deleted.`,
-    });
+    }).catch(() => {});
+
   };
 
   const handleUpdateManagedUser = (userId: string, updates: Partial<VantorUser>) => {
@@ -1169,7 +962,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       managedUser.id === userId ? { ...managedUser, ...updates } : managedUser
     );
     setManagedUsers(nextUsers);
-    persistState({ users: nextUsers }).catch((error) => setLoadError(error.message));
+    persistState({ users: nextUsers }).catch(() => {});
   };
 
   const handleDeleteManagedUser = (userId: string) => {
@@ -1195,7 +988,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       onConfirm: () => {
         const nextUsers = managedUsers.filter((managedUser) => managedUser.id !== userId);
         setManagedUsers(nextUsers);
-        persistState({ users: nextUsers }).catch((error) => setLoadError(error.message));
+        persistState({ users: nextUsers }).catch(() => {});
       },
     });
   };
@@ -1229,7 +1022,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
         const nextLogs = [createAuditLog('DELETE', folderToDelete.name, 'folder', `Deleted folder and subcontents`), ...auditLogs];
         setAuditLogs(nextLogs);
         setRepositories(nextRepositories);
-        persistState({ folders: nextFolders, files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories }).catch((error) => setLoadError(error.message));
+        persistState({ folders: nextFolders, files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories }).catch(() => {});
       }
     } else {
       const fileToDelete = files.find((f) => f.id === id);
@@ -1240,7 +1033,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
         const nextLogs = [createAuditLog('DELETE', fileToDelete.name, 'file', `Deleted file`), ...auditLogs];
         setAuditLogs(nextLogs);
         setRepositories(nextRepositories);
-        persistState({ files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories }).catch((error) => setLoadError(error.message));
+        persistState({ files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories }).catch(() => {});
       }
     }
   };
@@ -1281,7 +1074,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       setFolders(nextFolders);
       setAuditLogs(nextLogs);
       setRepositories(nextRepositories);
-      persistState({ folders: nextFolders, auditLogs: nextLogs, repositories: nextRepositories }).catch((error) => setLoadError(error.message));
+      persistState({ folders: nextFolders, auditLogs: nextLogs, repositories: nextRepositories }).catch(() => {});
     } else {
       const nextFiles = files.map((file) =>
         file.id === dialog.item.id ? { ...file, name: nextName } : file
@@ -1291,11 +1084,11 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       setFiles(nextFiles);
       setAuditLogs(nextLogs);
       setRepositories(nextRepositories);
-      persistState({ files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories }).catch((error) => setLoadError(error.message));
+      persistState({ files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories }).catch(() => {});
     }
 
     setDialog(null);
-    addToast({ type: 'info', title: 'Item renamed', message: `Renamed to "${nextName}".` });
+
   };
 
   const getFolderPathString = (folder: VantorFolder, allFolders: VantorFolder[]): string => {
@@ -1425,7 +1218,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       setFiles(nextFiles);
       setAuditLogs(nextLogs);
       setRepositories(nextRepositories);
-      persistState({ folders: nextFolders, files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories }).catch((error) => setLoadError(error.message));
+      persistState({ folders: nextFolders, files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories }).catch(() => {});
     } else {
       const nextFiles = files.map((f) =>
         f.id === item.id ? { ...f, folderId: destId, repositoryId: targetRepoId } : f
@@ -1446,18 +1239,14 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       setFiles(nextFiles);
       setAuditLogs(nextLogs);
       setRepositories(nextRepositories);
-      persistState({ files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories }).catch((error) => setLoadError(error.message));
+      persistState({ files: nextFiles, auditLogs: nextLogs, repositories: nextRepositories }).catch(() => {});
     }
 
     setDialog(null);
-    addToast({
-      type: 'success',
-      title: 'Item moved',
-      message: `Moved "${item.name}" to ${targetRepo?.name || 'repository'} successfully.`,
-    });
+
   };
 
-  const handleSavePermissions = (
+  const handleSavePermissions = async (
     id: string,
     permissionLevel: PermissionLevel,
     allowedRoles: UserRole[],
@@ -1468,11 +1257,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     const targetObj = isFolder ? folders.find((f) => f.id === id) : files.find((f) => f.id === id);
     if (!targetObj) return;
 
-    const hasEditAccess = canEditItem(effectiveRole, currentUserId, targetObj, folders, currentRepository);
-    if (!hasEditAccess && !canManagePlatform) {
-      addToast({ type: 'error', title: 'Access denied', message: 'You do not have permissions to modify access rules.' });
-      return;
-    }
+    if (!canManagePlatform) throw new Error('Only administrators can change access policies.');
 
     let nextFolders = [...folders];
     let nextFiles = [...files];
@@ -1517,19 +1302,12 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     const nextLogs = [log, ...auditLogs];
     setAuditLogs(nextLogs);
 
-    persistState({ folders: nextFolders, files: nextFiles, auditLogs: nextLogs })
-      .then(() => {
-        addToast({ type: 'success', title: 'Permissions updated', message: `Permissions for "${targetObj.name}" saved successfully.` });
-      })
-      .catch((error) => setLoadError(error.message));
+    await persistState({ folders: nextFolders, files: nextFiles, auditLogs: nextLogs });
   };
 
-  const handleSaveShares = (nextShares: ShareLink[]) => {
+  const handleSaveShares = async (nextShares: ShareLink[]) => {
     setShares(nextShares);
-    const log = createAuditLog('PERMISSION_CHANGE', 'Public Share Links', 'file', 'Updated public share links configuration');
-    const nextLogs = [log, ...auditLogs];
-    setAuditLogs(nextLogs);
-    persistState({ shares: nextShares, auditLogs: nextLogs }).catch((error) => setLoadError(error.message));
+    await persistState({ shares: nextShares });
   };
 
   const addAuditLog = (
@@ -1541,7 +1319,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
   ) => {
     const nextLogs = [createAuditLog(action, targetName, targetType, details, repositoryId), ...auditLogs];
     setAuditLogs(nextLogs);
-    persistState({ auditLogs: nextLogs }).catch((error) => setLoadError(error.message));
+    persistState({ auditLogs: nextLogs }).catch(() => {});
   };
 
   const createAuditLog = (
@@ -1552,7 +1330,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     repositoryId?: string
   ) => {
     const newLog: AuditLog = {
-      id: `log-${Date.now()}`,
+      id: 'log-' + crypto.randomUUID(),
       action,
       targetName,
       targetType,
@@ -1632,6 +1410,8 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
 
       {/* Main Content Body */}
       <main id="main-content" tabIndex={-1} className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div role="status" aria-live="polite" className="text-xs text-slate-400">{saveStatus === 'saving' ? 'Saving changes…' : saveStatus === 'failed' ? 'The save could not be confirmed. Review the latest state and retry if needed.' : 'All changes saved'}</div>
+        {saveError && <div role="alert" className="text-sm text-red-300">{saveError} <button className="storage-button" onClick={() => reload().catch(e => setLoadError(e.message))}>Reload latest changes</button></div>}
         {loadError && (
           <div role="alert" className="rounded-lg border border-red-800 bg-red-950/40 p-4 text-sm text-red-200">
             <p>{loadError}</p>
@@ -1959,6 +1739,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
         onDeleteComment={handleDeleteComment}
       />
 
+      {canManagePlatform && <RecoveryPanel trash={recovery.trash} versions={recovery.versions} onRestored={async () => { await reload(); }} disabled={saveStatus === 'saving'} />}
       {/* Admin / Manager Dashboard Drawer / Modal */}
       <AdminDashboard
         isOpen={isAdminDashboardOpen && (canManagePlatform || effectiveRole === 'manager')}
@@ -1974,12 +1755,14 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
         showRepositoryIndex={showRepositoryIndex}
         currentUserId={user?.id || ''}
         onUploadFile={handleUploadFile}
+        uploadProgress={uploadProgress}
+        onCancelUpload={() => uploadController.current?.abort()}
         onCreateFolder={handleCreateFolder}
         onUpdateFileMetadata={(id, updates) => {
           if (!canManagePlatform) return;
           const nextFiles = files.map(f => f.id === id ? { ...f, ...updates } : f);
           setFiles(nextFiles);
-          persistState({ files: nextFiles }).catch((error) => setLoadError(error.message));
+          persistState({ files: nextFiles }).catch(() => {});
         }}
         onDeleteFile={(id) => handleDeleteItem(id, false)}
         onDeleteFolder={(id) => handleDeleteItem(id, true)}
@@ -1991,7 +1774,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
         onClearAuditLogs={() => {
           if (!canManagePlatform) return;
           setAuditLogs([]);
-          persistState({ auditLogs: [] }).catch((error) => setLoadError(error.message));
+          persistState({ auditLogs: [] }).catch(() => {});
         }}
         activeTabDefault={adminTabDefault}
       />
@@ -2215,6 +1998,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
           isFolder={permissionTarget.isFolder}
           onClose={() => setPermissionTarget(null)}
           onSavePermissions={handleSavePermissions}
+          canManagePolicy={canManagePlatform}
           users={managedUsers}
           currentUserId={user?.id || ''}
           shares={shares}

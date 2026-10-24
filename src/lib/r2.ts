@@ -5,7 +5,6 @@ const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || 'vantor-file-storage';
-const R2_PUBLIC_DOMAIN = process.env.R2_PUBLIC_DOMAIN;
 
 export const isR2Configured = (): boolean => {
   return Boolean(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY);
@@ -45,20 +44,7 @@ export const uploadToR2 = async (
 
   await s3.send(command);
 
-  let url = '';
-  if (R2_PUBLIC_DOMAIN) {
-    const domain = R2_PUBLIC_DOMAIN.endsWith('/') ? R2_PUBLIC_DOMAIN.slice(0, -1) : R2_PUBLIC_DOMAIN;
-    url = `${domain}/${r2Key}`;
-  } else {
-    // Generate 7-day presigned download URL
-    const getCommand = new GetObjectCommand({
-      Bucket: R2_BUCKET_NAME,
-      Key: r2Key,
-    });
-    url = await getSignedUrl(s3, getCommand, { expiresIn: 604800 });
-  }
-
-  return { url, r2Key };
+  return { url: `/api/public/files/${fileId}`, r2Key };
 };
 
 export const deleteFromR2 = async (r2Key: string): Promise<boolean> => {
@@ -80,15 +66,12 @@ export const deleteFromR2 = async (r2Key: string): Promise<boolean> => {
 
 export const getR2DownloadUrl = async (r2Key: string): Promise<string> => {
   if (!r2Key) return '';
-  if (R2_PUBLIC_DOMAIN) {
-    const domain = R2_PUBLIC_DOMAIN.endsWith('/') ? R2_PUBLIC_DOMAIN.slice(0, -1) : R2_PUBLIC_DOMAIN;
-    return `${domain}/${r2Key}`;
-  }
-
   const s3 = getR2Client();
   const getCommand = new GetObjectCommand({
     Bucket: R2_BUCKET_NAME,
     Key: r2Key,
   });
-  return getSignedUrl(s3, getCommand, { expiresIn: 3600 });
+  return getSignedUrl(s3, getCommand, { expiresIn: 60 });
 };
+
+export const readR2Object = async (key: string, range?: string) => getR2Client().send(new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key, Range: range }));

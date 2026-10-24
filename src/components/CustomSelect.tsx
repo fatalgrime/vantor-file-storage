@@ -121,7 +121,7 @@ export function CustomSelect<T extends string = string>({
             if (event.key === 'Tab') { setIsOpen(false); triggerRef.current?.focus(); }
             const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]'));
             const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-            let next = index;
+            let next: number;
             if (event.key === 'ArrowDown') next = (index + 1) % buttons.length;
             else if (event.key === 'ArrowUp') next = (index - 1 + buttons.length) % buttons.length;
             else if (event.key === 'Home') next = 0;

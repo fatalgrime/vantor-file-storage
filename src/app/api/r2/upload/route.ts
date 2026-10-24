@@ -1,101 +1,63 @@
-import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { neon } from '@neondatabase/serverless';
-import { isR2Configured, uploadToR2 } from '../../../../lib/r2';
-
-const getDb = () => {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error('DATABASE_URL environment variable is missing.');
-  }
-  return neon(connectionString);
-};
+import { deleteFromR2, isR2Configured, uploadToR2 } from '../../../../lib/r2';
+import { actor, writableDestination } from '../../../../lib/server/policy';
+import { database, ensureSchema, errorResponse, newId, readState } from '../../../../lib/server/store';
+import { StateError } from '../../../../lib/mutations';
+import { MAX_SINGLE_FILE_BYTES, TOTAL_STORAGE_CAPACITY_BYTES } from '../../../../lib/db';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
-
 export async function POST(request: Request) {
-  const { userId } = await auth();
-
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  let formData: FormData;
-  let file: File | null = null;
-  let fileId = `file-${Date.now()}`;
-
   try {
-    formData = await request.formData();
-    file = formData.get('file') as File | null;
-    fileId = (formData.get('fileId') as string) || fileId;
-  } catch {
-    return NextResponse.json({ error: 'Invalid form data' }, { status: 400 });
-  }
-
-  if (!file) {
-    return NextResponse.json({ error: 'No file provided in form data.' }, { status: 400 });
-  }
-
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  const mimeType = file.type || 'application/octet-stream';
-
-  // 1. Try Cloudflare R2 if configured
-  if (isR2Configured()) {
-    try {
-      const { url, r2Key } = await uploadToR2(fileId, file.name, buffer, mimeType);
-      return NextResponse.json({
-        isR2: true,
-        url,
-        r2Key,
-        fileId,
-        size: file.size,
-      });
-    } catch (r2Error) {
-      console.warn('R2 upload failed, falling back to database blob storage:', r2Error);
+    const { userId } = await auth();
+    if (!userId) throw new StateError('Unauthorized', 401);
+    await ensureSchema();
+    const { state } = await readState();
+    const user = actor(state, userId);
+    const params = new URL(request.url).searchParams;
+    const repositoryId = params.get('repositoryId') || 'repo-default', folderId = params.get('folderId') || null;
+    if (!writableDestination(state, user, repositoryId, folderId)) throw new StateError('You cannot upload to this location.', 403);
+    // Raw binary requests allow limits and cancellation without buffering a multipart envelope.
+    const size = Number(request.headers.get('content-length') || 0);
+    if (size > MAX_SINGLE_FILE_BYTES) throw new StateError('Maximum file size is 50 MB.', 413);
+    const reader = request.body?.getReader();
+    if (!reader) throw new StateError('No file provided.');
+    const chunks: Uint8Array[] = []; let received = 0;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      received += value.length;
+      if (received > MAX_SINGLE_FILE_BYTES) { await reader.cancel(); throw new StateError('Maximum file size is 50 MB.', 413); }
+      chunks.push(value);
     }
-  }
-
-  // 2. Database Blob Storage Fallback (Neon PostgreSQL)
-  try {
-    const sql = getDb();
-    
-    await sql`
-      CREATE TABLE IF NOT EXISTS vantor_file_blobs (
-        file_id TEXT PRIMARY KEY,
-        filename TEXT NOT NULL,
-        mime_type TEXT NOT NULL,
-        data BYTEA NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-
-    const hexData = `\\x${buffer.toString('hex')}`;
-
-    await sql`
-      INSERT INTO vantor_file_blobs (file_id, filename, mime_type, data)
-      VALUES (${fileId}, ${file.name}, ${mimeType}, ${hexData}::bytea)
-      ON CONFLICT (file_id) DO UPDATE SET
-        filename = EXCLUDED.filename,
-        mime_type = EXCLUDED.mime_type,
-        data = EXCLUDED.data,
-        created_at = NOW()
-    `;
-
-    const fallbackUrl = `/api/public/files/${fileId}`;
-
-    return NextResponse.json({
-      isR2: false,
-      url: fallbackUrl,
-      fileId,
-      size: file.size,
-    });
-  } catch (dbError) {
-    console.error('Database blob storage error:', dbError);
-    return NextResponse.json(
-      { error: dbError instanceof Error ? dbError.message : 'Failed to store file blob in database.' },
-      { status: 500 }
-    );
-  }
+    if (state.files.reduce((sum, f) => sum + f.size, 0) + received > TOTAL_STORAGE_CAPACITY_BYTES) throw new StateError('Storage capacity exceeded.', 413);
+    const fileId = newId('file');
+    let filename: string;
+    try { filename = decodeURIComponent(request.headers.get('x-file-name') || 'file'); } catch { throw new StateError('Invalid file name.'); }
+    if (!filename.trim() || filename.length > 255) throw new StateError('Invalid file name.');
+    const mimeType = request.headers.get('content-type') || 'application/octet-stream';
+    if (mimeType.length > 255) throw new StateError('Invalid MIME type.');
+    const buffer = Buffer.concat(chunks);
+    let r2Key: string | null = null;
+    // Atomically reserve quota, including uploads that are not attached yet.
+    const reserved = await database()`WITH reserved AS (UPDATE vantor_storage_quota SET reserved_bytes = reserved_bytes + ${received} WHERE id = 'default' AND reserved_bytes + ${received} <= ${TOTAL_STORAGE_CAPACITY_BYTES} RETURNING id) INSERT INTO vantor_uploads (file_id, owner_id, repository_id, folder_id, size, mime_type) SELECT ${fileId}, ${userId}, ${repositoryId}, ${folderId}, ${received}, ${mimeType} FROM reserved RETURNING file_id`;
+    if (!reserved.length) throw new StateError('Storage capacity exceeded.', 413);
+    try {
+      if (isR2Configured()) {
+        r2Key = `files/${fileId}/${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+        await uploadToR2(fileId, filename, buffer, mimeType);
+      }
+      else await database()`INSERT INTO vantor_file_blobs (file_id, filename, mime_type, data) VALUES (${fileId}, ${filename}, ${mimeType}, ${`\\x${buffer.toString('hex')}`}::bytea)`;
+      await database()`UPDATE vantor_uploads SET r2_key = ${r2Key}, completed = true WHERE file_id = ${fileId}`;
+    } catch (error) {
+      // Release a reservation only after its bytes have been removed.
+      const removed = !r2Key || await deleteFromR2(r2Key);
+      if (removed) {
+        await database()`DELETE FROM vantor_file_blobs WHERE file_id = ${fileId}`;
+        await database()`WITH removed AS (DELETE FROM vantor_uploads WHERE file_id = ${fileId} RETURNING size) UPDATE vantor_storage_quota SET reserved_bytes = reserved_bytes - COALESCE((SELECT SUM(size) FROM removed), 0) WHERE id = 'default'`;
+      }
+      throw error;
+    }
+    return Response.json({ fileId, url: `/api/public/files/${fileId}`, size: received }, { headers: { 'Cache-Control': 'private, no-store' } });
+  } catch (error) { return errorResponse(error); }
 }
