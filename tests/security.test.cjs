@@ -173,6 +173,13 @@ test('cyclic folders and cross-repository parents are rejected and share travers
   dbState.folders = [{ ...folder('x'), repositoryId: 'elsewhere' }]; dbState.files[0].folderId = 'x';
   assert.throws(() => validateHierarchy(dbState), /same repository|does not exist/);
 });
+test('nested folder creation inherits its repository from the selected parent', async () => {
+  dbState.folders = [folder('parent')];
+  const child = { ...folder('child', 'parent'), repositoryId: 'stale-repository' };
+  const response = await patch([{ collection: 'folders', id: child.id, before: null, after: child }]);
+  assert.equal(response.status, 200);
+  assert.equal(dbState.folders.find(item => item.id === child.id).repositoryId, 'repo-default');
+});
 test('share passwords are salted hashes and incorrect attempts do not grant a session', async () => {
   const hash = hashPassword('correct'); assert.notEqual(hash, hashPassword('correct'));
   assert.equal(verifyPassword('correct', hash), true); assert.equal(verifyPassword('wrong', hash), false);

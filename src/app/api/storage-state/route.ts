@@ -25,13 +25,19 @@ export async function PATCH(request: Request) {
     if (!userId) throw new StateError('Unauthorized', 401);
     const body = await jsonBody(request);
     if (!body || !Array.isArray(body.mutations) || body.mutations.length > 2000 || Object.keys(body).some(k => !['mutations', 'metadata'].includes(k))) throw new StateError('Use record mutations to save changes.');
-    const mutations = body.mutations as Mutation[];
-    if (mutations.some(m => !m || typeof m !== 'object' || m.before === undefined || m.after === undefined)) throw new StateError('Invalid mutation.');
+    const requestedMutations = body.mutations as Mutation[];
+    if (requestedMutations.some(m => !m || typeof m !== 'object' || m.before === undefined || m.after === undefined)) throw new StateError('Invalid mutation.');
     const metadata = body.metadata || {};
     await ensureSchema();
     for (let attempt = 0; attempt < 10; attempt++) {
       const { state, revision } = await readState();
       const user = actor(state, userId);
+      const mutations = requestedMutations.map(m => {
+        if (m.collection !== 'folders' || !m.after?.parentId || (m.before && m.before.parentId === m.after.parentId)) return m;
+        const parent = state.folders.find(folder => folder.id === m.after!.parentId);
+        if (!parent) throw new StateError('The parent folder no longer exists. Reload and try again.', 409);
+        return { ...m, after: { ...m.after, repositoryId: parent.repositoryId } };
+      });
       validateMutations(state, userId, mutations, metadata);
       for (const [key, change] of Object.entries(metadata) as [string, any][]) {
         const visible = visibleState(state, userId, revision) as any;
