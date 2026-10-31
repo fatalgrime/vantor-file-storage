@@ -32,11 +32,32 @@ export async function PATCH(request: Request) {
     for (let attempt = 0; attempt < 10; attempt++) {
       const { state, revision } = await readState();
       const user = actor(state, userId);
+      const parentById = new Map(state.folders.map(folder => [folder.id, folder]));
+      const folderMutations = new Map(requestedMutations.filter(m => m.collection === 'folders').map(m => [m.id, m]));
+      const repositoryForParent = (id: string): string | undefined => {
+        const visited = new Set<string>();
+        let currentId: string | null | undefined = id;
+        while (currentId) {
+          if (visited.has(currentId)) throw new StateError('Folders cannot contain a cycle.');
+          visited.add(currentId);
+          const mutation = folderMutations.get(currentId);
+          const parent: any = mutation?.after || parentById.get(currentId);
+          if (!parent) return undefined;
+          if (parent.repositoryId) return parent.repositoryId;
+          currentId = parent.parentId;
+        }
+        return undefined;
+      };
       const mutations = requestedMutations.map(m => {
-        if (m.collection !== 'folders' || !m.after?.parentId || (m.before && m.before.parentId === m.after.parentId)) return m;
-        const parent = state.folders.find(folder => folder.id === m.after!.parentId);
-        if (!parent) throw new StateError('The parent folder no longer exists. Reload and try again.', 409);
-        return { ...m, after: { ...m.after, repositoryId: parent.repositoryId } };
+        if (m.collection !== 'folders' || !m.after) return m;
+        if (m.after.parentId) {
+          const repositoryId = repositoryForParent(m.after.parentId);
+          if (!repositoryId) throw new StateError('The parent folder no longer exists. Reload and try again.', 409);
+          const after: any = { ...m.after, repositoryId };
+          parentById.set(m.id, after);
+          return { ...m, after };
+        }
+        return m;
       });
       validateMutations(state, userId, mutations, metadata);
       for (const [key, change] of Object.entries(metadata) as [string, any][]) {

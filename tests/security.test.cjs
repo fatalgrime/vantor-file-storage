@@ -60,6 +60,7 @@ const { actor, safeFile, visibleState, validateMutations, validateHierarchy } = 
 const { diffCollections, applyMutations } = require('../src/lib/mutations.ts');
 const { isWithinFolder, checkShareCapacity } = require('../src/lib/server/shares.ts');
 const stateRoute = require('../src/app/api/storage-state/route.ts');
+const foldersRoute = require('../src/app/api/folders/route.ts');
 const uploadRoute = require('../src/app/api/r2/upload/route.ts');
 const shareRoute = require('../src/app/api/public/share/[shareId]/route.ts');
 const fileRoute = require('../src/app/api/public/files/[fileId]/route.ts');
@@ -179,6 +180,13 @@ test('nested folder creation inherits its repository from the selected parent', 
   const response = await patch([{ collection: 'folders', id: child.id, before: null, after: child }]);
   assert.equal(response.status, 200);
   assert.equal(dbState.folders.find(item => item.id === child.id).repositoryId, 'repo-default');
+});
+test('folder creation endpoint assigns the parent repository on the server', async () => {
+  dbState.folders = [folder('parent')];
+  const response = await foldersRoute.POST(request('/api/folders', { name: 'child', parentId: 'parent', repositoryId: 'stale-repository', permissionLevel: 'public', allowedRoles: [] }, 'POST'));
+  assert.equal(response.status, 201);
+  assert.equal(dbState.folders.at(-1).repositoryId, 'repo-default');
+  assert.equal(dbState.folders.at(-1).parentId, 'parent');
 });
 test('share passwords are salted hashes and incorrect attempts do not grant a session', async () => {
   const hash = hashPassword('correct'); assert.notEqual(hash, hashPassword('correct'));

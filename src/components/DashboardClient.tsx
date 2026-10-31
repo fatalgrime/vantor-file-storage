@@ -749,47 +749,35 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
   };
 
   const handleCreateFolder = async (newFolderData: Partial<VantorFolder>) => {
-    const destFolderId = newFolderData.parentId !== undefined ? newFolderData.parentId : currentFolderId;
-    const destFolder = destFolderId ? folders.find((f) => f.id === destFolderId) : undefined;
-    const targetRepoId = destFolder?.repositoryId || currentRepositoryId;
-    const targetRepository = repositories.find(repository => repository.id === targetRepoId);
-    if (!targetRepository) throw new Error('Select or create a repository before creating a folder.');
-    const hasWriteAccess = destFolder
-      ? canEditItem(effectiveRole, currentUserId, destFolder, folders, targetRepository)
-      : userCanEditRepository(effectiveRole, currentUserId, targetRepository);
-
-    if (!hasWriteAccess) {
+    const parentId = newFolderData.parentId !== undefined ? newFolderData.parentId : currentFolderId;
+    const parent = parentId ? folders.find(folder => folder.id === parentId) : undefined;
+    const repositoryId = parent?.repositoryId || currentRepositoryId;
+    const repository = repositories.find(item => item.id === repositoryId);
+    if (!repository) throw new Error('Select or create a repository before creating a folder.');
+    const canWrite = parent
+      ? canEditItem(effectiveRole, currentUserId, parent, folders, repository)
+      : userCanEditRepository(effectiveRole, currentUserId, repository);
+    if (!canWrite) {
       addToast({ type: 'error', title: 'Access denied', message: 'You do not have editor permissions in this location.' });
       throw new Error('You do not have permission to create a folder here.');
     }
 
-    const newFolder: VantorFolder = {
-      id: `folder-${Date.now()}`,
-      name: newFolderData.name || 'New Folder',
-      parentId: destFolderId,
-      description: newFolderData.description || 'Directory folder',
-      permissionLevel: newFolderData.permissionLevel || 'public',
-      allowedRoles: newFolderData.allowedRoles || ALL_USER_ROLES,
-      itemCount: 0,
-      totalSize: 0,
-      formattedSize: '0 KB',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: displayName,
-      repositoryId: targetRepoId,
-    };
-
-    const nextFolders = [...folders, newFolder];
-    const nextLogs = [createAuditLog('FOLDER_CREATE', newFolder.name, 'folder', `Created new folder directory`), ...auditLogs];
-    const nextRepositories = touchRepository(targetRepoId);
-
-    setFolders(nextFolders);
-    setAuditLogs(nextLogs);
-    setRepositories(nextRepositories);
-
     try {
-      await persistState({ folders: nextFolders, auditLogs: nextLogs, repositories: nextRepositories });
-      addToast({ type: 'success', title: 'Folder created', message: `"${newFolder.name}" directory created.` });
+      const response = await fetch('/api/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newFolderData.name || 'New Folder', parentId, repositoryId,
+          description: newFolderData.description || 'Directory folder',
+          permissionLevel: newFolderData.permissionLevel || 'public',
+          allowedRoles: newFolderData.allowedRoles || ALL_USER_ROLES,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to create folder.');
+      applyServerState(result.state);
+      initialize(result.state);
+      addToast({ type: 'success', title: 'Folder created', message: `"${result.folder.name}" directory created.` });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to save folder to database.';
       addToast({ type: 'error', title: 'Creation Failed', message: msg });

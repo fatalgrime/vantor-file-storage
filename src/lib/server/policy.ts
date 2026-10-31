@@ -140,7 +140,13 @@ export function validateMutations(state: AppState, userId: string, mutations: Mu
       if (typeof next.name !== 'string' || !next.name.trim() || next.name.length > 255 || !['public', 'authenticated', 'private', 'role_restricted'].includes(next.permissionLevel) || !Array.isArray(next.allowedRoles) || next.allowedRoles.some((r: UserRole) => !['admin', 'manager', 'member', 'viewer'].includes(r))) throw new StateError('Invalid item metadata.');
       if (old && !admin && policyFields.some(k => !equal((old as any)[k] ?? [], next[k] ?? []))) throw new StateError('Only administrators can change access policies.', 403);
       const destination = m.collection === 'files' ? next.folderId : next.parentId;
-      if ((!old || (old.repositoryId || '') !== (next.repositoryId || '') || (m.collection === 'files' ? (old as VantorFile).folderId : (old as VantorFolder).parentId) !== destination) && !writableDestination(destinationState, user, next.repositoryId || '', destination || null)) throw new StateError('You cannot write to that destination.', 403);
+      const isNewFolderParent = m.collection === 'folders' && Boolean(destination) && mutations.some(candidate => candidate.collection === 'folders' && candidate.id === destination && !state.folders.some(folder => folder.id === destination));
+      const destinationWritable = isNewFolderParent
+        ? Boolean(state.repositories.find(repository => repository.id === (next.repositoryId || '')) && canEditRepository(user.role, user.id, state.repositories.find(repository => repository.id === (next.repositoryId || ''))!))
+        : m.collection === 'folders' && !destination
+          ? Boolean(state.repositories.find(repository => repository.id === (next.repositoryId || '')) && canEditRepository(user.role, user.id, state.repositories.find(repository => repository.id === (next.repositoryId || ''))!))
+          : writableDestination(destinationState, user, next.repositoryId || '', destination || null);
+      if ((!old || (old.repositoryId || '') !== (next.repositoryId || '') || (m.collection === 'files' ? (old as VantorFile).folderId : (old as VantorFolder).parentId) !== destination) && !destinationWritable) throw new StateError('You cannot write to that destination.', 403);
       if (m.collection === 'files' && old && ['content', 'r2Key', 'url', 'storageId', ...(next.uploadId ? [] : ['size', 'mimeType'])].some(k => !equal((m.before as any)?.[k], next[k]))) throw new StateError('Upload new content before changing the file.');
       if (m.collection === 'files' && next && (!Number.isFinite(next.size) || next.size < 0 || next.size > 50 * 1024 * 1024)) throw new StateError('Invalid file size.');
     }
