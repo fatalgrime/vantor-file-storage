@@ -67,9 +67,9 @@ interface AdminDashboardProps {
   onDeleteFolder: (folderId: string) => void;
   onUpdateUser: (userId: string, updates: Partial<VantorUser>) => void;
   onDeleteUser: (userId: string) => void;
-  onCreateAnnouncement?: (newAnnouncement: Partial<Announcement>) => void;
-  onUpdateAnnouncement?: (id: string, updates: Partial<Announcement>) => void;
-  onDeleteAnnouncement?: (id: string) => void;
+  onCreateAnnouncement?: (newAnnouncement: Partial<Announcement>) => Promise<void>;
+  onUpdateAnnouncement?: (id: string, updates: Partial<Announcement>) => Promise<void>;
+  onDeleteAnnouncement?: (id: string) => Promise<void>;
   onClearAuditLogs?: () => void;
   activeTabDefault?: AdminTab;
   recoveryPanel?: React.ReactNode;
@@ -159,6 +159,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [announcementLinkUrl, setAnnouncementLinkUrl] = useState('');
   const [announcementLinkText, setAnnouncementLinkText] = useState('');
   const [announcementIsActive, setAnnouncementIsActive] = useState(true);
+  const [isPublishingAnnouncement, setIsPublishingAnnouncement] = useState(false);
 
   const currentRepo = repositories.find(r => r.id === currentRepositoryId);
   const currentRepoName = currentRepo?.name || 'Select a repository';
@@ -287,15 +288,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     finally { setIsCreatingFolder(false); }
   };
 
-  const handleAnnouncementSubmit = (e: React.FormEvent) => {
+  const handleAnnouncementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPublishingAnnouncement) return;
     if (!announcementTitle.trim() || !announcementContent.trim()) {
       addToast({ type: 'error', title: 'Missing fields', message: 'Please enter both title and content.' });
       return;
     }
 
-    if (onCreateAnnouncement) {
-      onCreateAnnouncement({
+    setIsPublishingAnnouncement(true);
+    try {
+      if (!onCreateAnnouncement) throw new Error('Announcement publishing is unavailable.');
+      await onCreateAnnouncement({
         title: announcementTitle.trim(),
         type: announcementType,
         content: announcementContent.trim(),
@@ -304,15 +308,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         isActive: announcementIsActive,
         createdBy: 'System Admin',
       });
-
+      addToast({ type: 'success', title: 'Announcement published' });
+      setAnnouncementTitle('');
+      setAnnouncementContent('');
+      setAnnouncementLinkUrl('');
+      setAnnouncementLinkText('');
+      setAnnouncementType('info');
+      setAnnouncementIsActive(true);
+    } catch (error) {
+      addToast({ type: 'error', title: 'Announcement was not published', message: error instanceof Error ? error.message : 'Please try again.' });
+    } finally {
+      setIsPublishingAnnouncement(false);
     }
-
-    setAnnouncementTitle('');
-    setAnnouncementContent('');
-    setAnnouncementLinkUrl('');
-    setAnnouncementLinkText('');
-    setAnnouncementType('info');
-    setAnnouncementIsActive(true);
   };
 
   const calculateTotalSizeBytes = () => {
@@ -750,10 +757,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                         <button
                           type="submit"
+                          disabled={isPublishingAnnouncement}
                           className="rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-bold text-white shadow-md transition-all flex items-center space-x-1.5"
                         >
                           <Plus className="h-4 w-4" />
-                          <span>Publish Announcement</span>
+                          <span>{isPublishingAnnouncement ? 'Publishing…' : 'Publish Announcement'}</span>
                         </button>
                       </div>
                     </form>
@@ -841,12 +849,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <div className="flex items-center space-x-2 flex-shrink-0 self-end md:self-center">
                               {onUpdateAnnouncement && (
                                 <button
-                                  onClick={() => {
-                                    onUpdateAnnouncement(announcement.id, { isActive: !announcement.isActive });
-                                    addToast({
+                                  onClick={async () => {
+                                    try {
+                                      await onUpdateAnnouncement(announcement.id, { isActive: !announcement.isActive });
+                                      addToast({
                                       type: 'info',
                                       title: announcement.isActive ? 'Announcement Deactivated' : 'Announcement Activated',
-                                    });
+                                      });
+                                    } catch (error) {
+                                      addToast({ type: 'error', title: 'Announcement was not updated', message: error instanceof Error ? error.message : 'Please try again.' });
+                                    }
                                   }}
                                   className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${announcement.isActive
                                     ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
@@ -860,9 +872,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                               {onDeleteAnnouncement && (
                                 <button
-                                  onClick={() => {
-                                    onDeleteAnnouncement(announcement.id);
-                                    addToast({ type: 'success', title: 'Announcement Deleted' });
+                                  onClick={async () => {
+                                    try {
+                                      await onDeleteAnnouncement(announcement.id);
+                                      addToast({ type: 'success', title: 'Announcement Deleted' });
+                                    } catch (error) {
+                                      addToast({ type: 'error', title: 'Announcement was not deleted', message: error instanceof Error ? error.message : 'Please try again.' });
+                                    }
                                   }}
                                   className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border border-red-800 bg-red-950/60 text-red-300 hover:bg-red-900 hover:text-white transition-colors"
                                   title="Delete announcement"

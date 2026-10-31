@@ -208,8 +208,8 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
   const [adminTabDefault, setAdminTabDefault] = useState<AdminTab>('upload');
 
   // Announcement Handlers
-  const handleCreateAnnouncement = (newAnnouncement: Partial<Announcement>) => {
-    if (!canManagePlatform) return;
+  const handleCreateAnnouncement = async (newAnnouncement: Partial<Announcement>) => {
+    if (!canManagePlatform) throw new Error('Only administrators can publish announcements.');
     const created: Announcement = {
       id: `announcement-${Date.now()}`,
       title: newAnnouncement.title || 'Untitled Announcement',
@@ -237,11 +237,11 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     const nextLogs = [log, ...auditLogs];
     setAnnouncements(nextAnnouncements);
     setAuditLogs(nextLogs);
-    persistState({ announcements: nextAnnouncements, auditLogs: nextLogs }).catch(() => {});
+    await persistState({ announcements: nextAnnouncements, auditLogs: nextLogs });
   };
 
-  const handleUpdateAnnouncement = (id: string, updates: Partial<Announcement>) => {
-    if (!canManagePlatform) return;
+  const handleUpdateAnnouncement = async (id: string, updates: Partial<Announcement>) => {
+    if (!canManagePlatform) throw new Error('Only administrators can manage announcements.');
     const nextAnnouncements = announcements.map((a) => (a.id === id ? { ...a, ...updates, updatedAt: new Date().toISOString() } : a));
     const target = announcements.find((a) => a.id === id);
 
@@ -259,11 +259,11 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     const nextLogs = [log, ...auditLogs];
     setAnnouncements(nextAnnouncements);
     setAuditLogs(nextLogs);
-    persistState({ announcements: nextAnnouncements, auditLogs: nextLogs }).catch(() => {});
+    await persistState({ announcements: nextAnnouncements, auditLogs: nextLogs });
   };
 
-  const handleDeleteAnnouncement = (id: string) => {
-    if (!canManagePlatform) return;
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (!canManagePlatform) throw new Error('Only administrators can manage announcements.');
     const target = announcements.find((a) => a.id === id);
     const nextAnnouncements = announcements.filter((a) => a.id !== id);
 
@@ -281,7 +281,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     const nextLogs = [log, ...auditLogs];
     setAnnouncements(nextAnnouncements);
     setAuditLogs(nextLogs);
-    persistState({ announcements: nextAnnouncements, auditLogs: nextLogs }).catch(() => {});
+    await persistState({ announcements: nextAnnouncements, auditLogs: nextLogs });
   };
 
   // Access Control Permission Modal state
@@ -678,6 +678,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     const destFolder = destFolderId ? folders.find(f => f.id === destFolderId) : undefined;
     const targetRepoId = replacement?.repositoryId || destFolder?.repositoryId || currentRepositoryId || '';
     const destinationRepository = repositories.find(r => r.id === targetRepoId);
+    if (!destinationRepository) throw new Error('Select or create a repository before uploading a file.');
     const hasWriteAccess = replacement
       ? canEditItem(effectiveRole, currentUserId, replacement, folders, destinationRepository)
       : destFolder ? canEditItem(effectiveRole, currentUserId, destFolder, folders, destinationRepository)
@@ -750,16 +751,17 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
   const handleCreateFolder = async (newFolderData: Partial<VantorFolder>) => {
     const destFolderId = newFolderData.parentId !== undefined ? newFolderData.parentId : currentFolderId;
     const destFolder = destFolderId ? folders.find((f) => f.id === destFolderId) : undefined;
+    const targetRepoId = destFolder?.repositoryId || currentRepositoryId;
+    const targetRepository = repositories.find(repository => repository.id === targetRepoId);
+    if (!targetRepository) throw new Error('Select or create a repository before creating a folder.');
     const hasWriteAccess = destFolder
-      ? canEditItem(effectiveRole, currentUserId, destFolder, folders, currentRepository)
-      : (currentRepository ? canEditCurrentRepository : true);
+      ? canEditItem(effectiveRole, currentUserId, destFolder, folders, targetRepository)
+      : userCanEditRepository(effectiveRole, currentUserId, targetRepository);
 
     if (!hasWriteAccess) {
       addToast({ type: 'error', title: 'Access denied', message: 'You do not have editor permissions in this location.' });
       throw new Error('You do not have permission to create a folder here.');
     }
-
-    const targetRepoId = currentRepositoryId || '';
 
     const newFolder: VantorFolder = {
       id: `folder-${Date.now()}`,
@@ -843,7 +845,7 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
     });
   };
 
-  const handleSaveRepository = () => {
+  const handleSaveRepository = async () => {
     if (!dialog || dialog.type !== 'createRepository') return;
     if (!canManagePlatform) return;
 
@@ -861,14 +863,18 @@ function DashboardClientInner({ initialRepositoryId, initialSearchQuery = '', in
       assignedRoles: ['manager', 'member'],
     };
     const nextRepositories = [...repositories, newRepository];
+    try {
+      await persistState({ repositories: nextRepositories });
+    } catch (error) {
+      addToast({ type: 'error', title: 'Repository was not saved', message: error instanceof Error ? error.message : 'Please try again.' });
+      return;
+    }
     setRepositories(nextRepositories);
     setCurrentRepositoryId(newRepository.id);
     setCurrentFolderId(null);
     setSelectedIds([]);
     setSearchQuery('');
     setDialog(null);
-    persistState({ repositories: nextRepositories }).catch(() => {});
-
   };
 
   const handleRenameRepository = (repository: VantorRepository) => {
