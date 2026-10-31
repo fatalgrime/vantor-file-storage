@@ -1,5 +1,5 @@
-import { DashboardClient } from '../../components/DashboardClient';
+import Home from '../page';
 
 export default function DashboardPage() {
-  return <DashboardClient showRepositoryIndex />;
+  return <Home />;
 }
