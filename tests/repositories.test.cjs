@@ -34,6 +34,21 @@ test('migration removes default designations without moving or deleting existing
   assert.deepEqual(migrateRepositoryConfiguration(state), state);
   assert.equal(input.files[0].repositoryId, undefined);
 });
+test('migration fills missing legacy repository assignments without granting access', () => {
+  const legacy = { id: 'legacy', name: 'Legacy', description: '', createdAt: '', updatedAt: '', createdBy: 'admin' };
+  const input = {
+    repositories: [legacy],
+    files: [],
+    folders: [],
+    trash: [{ collection: 'repositories', record: legacy }],
+  };
+  const state = migrateRepositoryConfiguration(input);
+  assert.deepEqual(state.repositories[0].assignedUserIds, []);
+  assert.deepEqual(state.repositories[0].assignedRoles, []);
+  assert.deepEqual(state.trash[0].record.assignedUserIds, []);
+  assert.deepEqual(state.trash[0].record.assignedRoles, []);
+  assert.deepEqual(migrateRepositoryConfiguration(state), state);
+});
 test('there is no seeded default and new content must select an explicit repository', () => {
   assert.deepEqual(INITIAL_REPOSITORIES, []);
   const state = { repositories: assignRepositorySlugs(repositories), files: [], folders: [] };

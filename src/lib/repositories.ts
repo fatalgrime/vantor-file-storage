@@ -40,11 +40,16 @@ export function migrateRepositoryConfiguration<T extends { repositories: VantorR
   delete rest.defaultRepoId;
   const legacyExists = state.repositories.some(r => r.id === 'repo-default');
   const explicitOwner = (record: any) => legacyExists && !record.repositoryId ? { ...record, repositoryId: 'repo-default' } : record;
+  const withAssignments = (repository: VantorRepository) => ({
+    ...repository,
+    assignedUserIds: repository.assignedUserIds ?? [],
+    assignedRoles: repository.assignedRoles ?? [],
+  });
   const { defaultRepositoryId: settingsDefault, defaultRepository: settingsRepository, defaultRepoId: settingsRepoId, ...settings } = state.settings || {};
   return {
-    ...rest, repositories: assignRepositorySlugs(state.repositories), settings,
+    ...rest, repositories: assignRepositorySlugs(state.repositories.map(withAssignments)), settings,
     files: (state.files || []).map(explicitOwner), folders: (state.folders || []).map(explicitOwner),
-    trash: (state.trash || []).map((entry: any) => ({ ...entry, record: entry.collection === 'files' || entry.collection === 'folders' ? explicitOwner(entry.record) : entry.collection === 'repositories' ? assignRepositorySlugs([entry.record])[0] : entry.record })),
+    trash: (state.trash || []).map((entry: any) => ({ ...entry, record: entry.collection === 'files' || entry.collection === 'folders' ? explicitOwner(entry.record) : entry.collection === 'repositories' ? assignRepositorySlugs([withAssignments(entry.record)])[0] : entry.record })),
     versions: (state.versions || []).map((entry: any) => ({ ...entry, record: explicitOwner(entry.record) })),
   } as T;
 }
