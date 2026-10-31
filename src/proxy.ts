@@ -1,28 +1,22 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-const isPublicRoute = createRouteMatcher([
-  '/',
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/api/public(.*)',
-  '/share(.*)',
-  '/api/public/share(.*)',
-]);
-const isAdminRoute = createRouteMatcher(['/admin(.*)', '/api/admin(.*)']);
-
-export default clerkMiddleware(async (auth, req) => {
-  if (isAdminRoute(req)) {
-    await auth.protect();
+export function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.json(
+      { error: 'Vantor Storage is temporarily unavailable while we prepare the new version.' },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 
-  if (!isPublicRoute(req)) {
-    await auth.protect();
-  }
-});
+  if (pathname === '/') return NextResponse.next();
+  return NextResponse.redirect(new URL('/', request.url), 307);
+}
 
 export const config = {
   matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|json|webmanifest|svg|png|jpg|jpeg|gif|webp|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|json|webmanifest|svg|png|jpg|jpeg|gif|webp|ico|csv|docx?|xlsx?|zip)).*)',
     '/(api|trpc)(.*)',
   ],
 };

@@ -1,40 +1,72 @@
-'use client';
+import { ArrowUpRight, Check, CircleHelp, Cloud, LockKeyhole, Sparkles } from 'lucide-react';
 
-import { useEffect } from 'react';
-import { useUser } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
+const highlights = [
+  { icon: Cloud, title: 'A better way to store', description: 'A refreshed experience for your team’s important files.' },
+  { icon: LockKeyhole, title: 'Built with care', description: 'A thoughtful new foundation for secure, reliable storage.' },
+  { icon: Sparkles, title: 'Coming together', description: 'We’re working behind the scenes on what’s next.' },
+];
 
 export default function Home() {
-  const { isLoaded, isSignedIn } = useUser();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      router.replace('/dashboard');
-    }
-  }, [isLoaded, isSignedIn, router]);
-
   return (
-    <div className="min-h-screen bg-[#060a17] text-slate-100 flex items-center justify-center px-6 font-sans">
-      <div className="text-center">
-        <div className="flex flex-col items-center justify-center space-y-3 mb-6 select-none">
-          <img
-            src="/logo.png"
-            alt="Vantor logo"
-            draggable={false}
-            onContextMenu={(e) => e.preventDefault()}
-            className="h-12 w-auto object-contain select-none pointer-events-auto"
-          />
-          <span className="text-xs font-semibold tracking-widest uppercase text-slate-400">Storage</span>
+    <main className="coming-soon-shell">
+      <div className="ambient ambient-one" aria-hidden="true" />
+      <div className="ambient ambient-two" aria-hidden="true" />
+      <header className="site-header">
+        <a className="brand" href="/" aria-label="Vantor Storage home">
+          <span className="brand-mark"><img src="/logo.png" alt="" /></span>
+          <span className="brand-name">vantor<span>storage</span></span>
+        </a>
+        <span className="header-status"><span className="status-dot" /> Platform refresh in progress</span>
+      </header>
+
+      <section className="hero-section" aria-labelledby="coming-soon-heading">
+        <div className="hero-copy">
+          <div className="eyebrow"><span className="eyebrow-line" /> A new chapter is on the way</div>
+          <h1 id="coming-soon-heading">Storage, <span>reimagined.</span></h1>
+          <p className="hero-lede">A new and improved Vantor Storage is on the way. We’re working on a better experience for the files and teams that matter.</p>
+          <div className="availability-notice" role="status">
+            <span className="notice-icon"><CircleHelp size={19} strokeWidth={1.8} /></span>
+            <p><strong>Vantor Storage is temporarily unavailable.</strong><br />All website functionality is currently disabled while we prepare the new version.</p>
+          </div>
+          <p className="contact-note"><span className="contact-check"><Check size={14} strokeWidth={2.5} /></span> Questions? Please contact your manager or system administrator.</p>
         </div>
-        <p className="mt-2 text-sm text-slate-300">Sign in to your repository dashboard.</p>
-        <button
-          onClick={() => router.push('/sign-in')}
-          className="mt-5 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 transition-colors shadow-md cursor-pointer"
-        >
-          Sign In
-        </button>
-      </div>
-    </div>
+
+        <div className="visual-wrap" aria-hidden="true">
+          <div className="visual-orbit orbit-outer" />
+          <div className="visual-orbit orbit-inner" />
+          <div className="visual-glow" />
+          <div className="storage-visual">
+            <div className="visual-topline"><span /><span /><span /></div>
+            <div className="visual-content">
+              <div className="visual-sidebar"><i /><i /><i /><i /></div>
+              <div className="visual-main">
+                <div className="visual-heading"><span /><b /></div>
+                <div className="visual-cards"><i /><i /><i /></div>
+                <div className="visual-file"><span className="file-icon" /><span className="file-lines"><i /><i /></span><b /></div>
+                <div className="visual-file"><span className="file-icon secondary" /><span className="file-lines"><i /><i /></span><b /></div>
+                <div className="visual-file"><span className="file-icon tertiary" /><span className="file-lines"><i /><i /></span><b /></div>
+              </div>
+            </div>
+          </div>
+          <div className="floating-badge badge-secure"><span><LockKeyhole size={16} /></span> Your files, thoughtfully protected</div>
+          <div className="floating-badge badge-cloud"><Cloud size={16} /> A fresh start is coming <ArrowUpRight size={14} /></div>
+        </div>
+      </section>
+
+      <section className="highlights" aria-label="What’s ahead">
+        {highlights.map(({ icon: Icon, title, description }, index) => (
+          <article className="highlight-card" key={title}>
+            <span className="highlight-icon"><Icon size={19} strokeWidth={1.8} /></span>
+            <div><h2>{title}</h2><p>{description}</p></div>
+            <span className="card-index">0{index + 1}</span>
+          </article>
+        ))}
+      </section>
+
+      <footer className="site-footer">
+        <span>© {new Date().getFullYear()} Vantor Storage</span>
+        <span className="footer-message"><span className="status-dot" /> We’ll be back with something better</span>
+      </footer>
+    </main>
   );
 }
